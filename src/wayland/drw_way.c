@@ -353,16 +353,6 @@ void drwFArcChord
 )
 {}
 
-void drwFArcPieSlice
-( const_winType actual_window,
-  intType x,
-  intType y,
-  intType radius,
-  floatType startAngle,
-  floatType sweepAngle
-)
-{}
-
 void drwFCircle (const_winType actual_window, intType x, intType y, intType radius)
 {}
 
@@ -464,10 +454,8 @@ winType drwImage (int32Type *image_data, memSizeType width, memSizeType height, 
 }
 
 // Assumes the buffer is all ready prepared, and doesn't message wayland.
-void drwLineRaw (const_winType actual_window, intType x1, intType y1, intType x2, intType y2, intType col)
+void drawRawLine (way_winType window, intType x1, intType y1, intType x2, intType y2, intType col)
 {
-  way_winType window = (way_winType) actual_window;
-
   /* Utilizing the slope-intercept formula:
     y = mx + b  (b, being the intercept, is zero for us.)
     m = y/x
@@ -615,6 +603,151 @@ winType drwNewPixmap (intType width, intType height)
 }
 
 // Could likey be optimized.
+// Assumes the window's buffer has all ready been prepared.
+void drawRawArc
+( way_winType window,
+  intType x,
+  intType y,
+  intType radius,
+  floatType startAngle,
+  floatType sweepAngle,
+  intType col
+)
+{
+  /* Angles are given as radians. Start angle of 0 is right, sweeps counter-clockwise.
+  As we are dealing with radians, 2 * PI is a full turn (or 360 degrees).
+  Jesko's method works with 1/8 turns. */
+  const float Turn8 = PI2 / 8.0;
+  boolType crossingBound = false;
+  startAngle = fmod(startAngle, PI2);
+  if (startAngle < 0)
+    startAngle += PI2;
+  floatType endAngle = startAngle + sweepAngle;
+  if (endAngle < 0)
+  { crossingBound = true;
+    endAngle += PI2;
+  }
+  else
+  if (endAngle > PI2)
+  { crossingBound = true;
+    endAngle = fmod(endAngle, PI2);
+  }
+
+  // Ensure the start angle is earlier in the arc.
+  if (startAngle > endAngle)
+  { floatType tempAngle = endAngle;
+    endAngle = startAngle;
+    startAngle = tempAngle;
+  }
+
+  intType t1 = radius / 16, // This division makes for a smoother edge.
+    t2 = 0,
+    xd = radius,
+    yd = 0;
+  intType pos = 0, maxPos = window->buffer->width * window->buffer->height;
+  intType xPos = 0, yPos = 0;
+  float angle = 0.0;
+  // printf("Start angle: %f   End angle: %f\n", startAngle, endAngle);
+
+  while (xd >= yd)
+  { // Using the coordinate, render the eight mirrored points when appropriate.
+    // Render right, downward A (plunges from the middle)
+    xPos = x + xd; yPos = y + yd; pos = yPos*window->buffer->width + xPos; angle = PI2 - ((float)yd / (float)xd) * Turn8;
+      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    // Render right, upward A (rises from the middle)
+    yPos = y - yd; pos = yPos*window->buffer->width + xPos; angle = ((float)yd / (float)xd) * Turn8;
+      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    // Render left, upward A
+    xPos = x - xd; pos = yPos*window->buffer->width + xPos; angle = PI - ((float)yd / (float)xd) * Turn8;
+      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    // Render left, downward A (these first four draw the "parenthesis" portion: ( )
+    yPos = y + yd; pos = yPos*window->buffer->width + xPos; angle = PI + ((float)yd / (float)xd) * Turn8;
+      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    // Render right, downard B (touches the bottom)
+    xPos = x + yd; yPos = y + xd; pos = yPos*window->buffer->width + xPos; angle = PI2*0.75 + ((float)yd / (float)xd) * Turn8;
+      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    // Render right, upward B (touches the top)
+    yPos = y - xd; pos = yPos*window->buffer->width + xPos; angle = PI*0.5 - ((float)yd / (float)xd) * Turn8;
+      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    // Render left, upward B
+    xPos = x - yd; pos = yPos*window->buffer->width + xPos; angle = PI*0.5 + ((float)yd / (float)xd) * Turn8;
+      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    // Render left, downward B
+    yPos = y + xd; pos = yPos*window->buffer->width + xPos; angle = PI2*0.75 - ((float)yd / (float)xd) * Turn8;
+      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+
+    // Adjust position.
+    yd += 1;
+    t1 += yd;
+    t2 = t1 - xd;
+
+    if (t2 >= 0)
+    { t1 = t2;
+      xd -= 1;
+    }
+  }
+
+  /* Option to step into an arc (unfinished).
+  Using these two formulas:
+    x^2 + y^2 = r^2
+    y = mx,  x = y/m,  m = y/x
+
+  Solve for x.
+    x^2 + y^2 = r^2
+    x^2 + (mx)^2 = r^2
+    x^2 + m^2*x^2 = r^2
+    (m^2+1)*x^2 = r^2
+    x^2 = r^2/(m^2+1)
+    x = sqrt(r^2/(m^2+1))
+
+  const float progress = startAngle == 0 ? 0.0 : (startAngle == Turn8 ? 1.0 : fmod(startAngle, Turn8));
+  const float initialSlope = progress / Turn8;
+  float initialX = !initialSlope ? radius : sqrt((radius*radius) / (initialSlope*initialSlope + 1.0)),
+    initialY = initialSlope * initialX;
+
+  intType pos = (y+yd)*window->buffer->width + x+xd,
+       maxPos = window->buffer->width * window->buffer->height;
+
+  while (angle <= sweepAngle)
+  { // Counter clockwise from the right: .--  ./  |  \.  --. etc.
+    if (pos < maxPos)
+      window->buffer->content[pos] = col;
+    //pos = (int)(y-xd)*window->buffer->width + x-yd;
+    //  window->buffer->content[pos] = col;
+    //pos = (int)(y-xd)*window->buffer->width + x+yd;
+    //  window->buffer->content[pos] = col;
+    //pos = (int)(y+yd)*window->buffer->width + x-xd;
+    //  window->buffer->content[pos] = col;
+    //pos = (int)(y-yd)*window->buffer->width + x-xd;
+    //  window->buffer->content[pos] = col;
+    //pos = (int)(y+xd)*window->buffer->width + x+yd;
+    //  window->buffer->content[pos] = col;
+    //pos = (int)(y+xd)*window->buffer->width + x-yd;
+    //  window->buffer->content[pos] = col;
+    //pos = (int)(y-yd)*window->buffer->width + x+xd;
+    //  window->buffer->content[pos] = col;
+    if (angle >= Turn8)
+      break;
+
+    if (slope < 1.0)
+    { yd -= 1.0;
+      // x^2 = r^2 - y^2  Therefore  x = sqrt(r^2 - y^2)
+      xd = sqrt(radius*radius - yd*yd);
+    }
+    else
+    { xd -= 1.0;
+      // y^2 = r^2 - x^2  Therefore  y = sqrt(r^2 - x^2)
+      yd = sqrt(radius*radius - xd*xd);
+    }
+    slope = yd && xd ? -yd/xd : 0;
+    pos = (y+yd)*window->buffer->width + x+xd;
+    // slope = progress / turn8  Therefore  progress = slope * turn8
+    angle = slope * Turn8;
+    printf("slope: %f  xd: %f  yd: %f\n", slope, xd, yd);
+  }*/
+}
+
+// Could likey be optimized.
 void drwPArc
 ( const_winType actual_window,
   intType x,
@@ -652,147 +785,7 @@ void drwPArc
   { way_winType window = (way_winType) actual_window;
 
     if (prepare_buffer_copy(&waylandState, window))
-    { /* Angles are given as radians. Start angle of 0 is right, sweeps counter-clockwise.
-      As we are dealing with radians, 2 * PI is a full turn (or 360 degrees).
-      Jesko's method works with 1/8 turns. */
-      const float Turn8 = PI2 / 8.0;
-      boolType crossingBound = false;
-      startAngle = fmod(startAngle, PI2);
-      if (startAngle < 0)
-        startAngle += PI2;
-      floatType endAngle = startAngle + sweepAngle;
-      if (endAngle < 0)
-      { crossingBound = true;
-        endAngle += PI2;
-      }
-      else
-      if (endAngle > PI2)
-      { crossingBound = true;
-        endAngle = fmod(endAngle, PI2);
-      }
-
-      // Ensure the start angle is earlier in the arc.
-      if (startAngle > endAngle)
-      { floatType tempAngle = endAngle;
-        endAngle = startAngle;
-        startAngle = tempAngle;
-      }
-
-      intType t1 = radius / 16, // This division makes for a smoother edge.
-        t2 = 0,
-        xd = radius,
-        yd = 0;
-      intType pos = 0, maxPos = window->buffer->width * window->buffer->height;
-      intType xPos = 0, yPos = 0;
-      float angle = 0.0;
-      // printf("Start angle: %f   End angle: %f\n", startAngle, endAngle);
-
-      while (xd >= yd)
-      { // Using the coordinate, render the eight mirrored points when appropriate.
-        // Render right, downward A (plunges from the middle)
-        xPos = x + xd; yPos = y + yd; pos = yPos*window->buffer->width + xPos; angle = PI2 - ((float)yd / (float)xd) * Turn8;
-          if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
-        // Render right, upward A (rises from the middle)
-        yPos = y - yd; pos = yPos*window->buffer->width + xPos; angle = ((float)yd / (float)xd) * Turn8;
-          if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
-        // Render left, upward A
-        xPos = x - xd; pos = yPos*window->buffer->width + xPos; angle = PI - ((float)yd / (float)xd) * Turn8;
-          if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
-        // Render left, downward A (these first four draw the "parenthesis" portion: ( )
-        yPos = y + yd; pos = yPos*window->buffer->width + xPos; angle = PI + ((float)yd / (float)xd) * Turn8;
-          if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
-        // Render right, downard B (touches the bottom)
-        xPos = x + yd; yPos = y + xd; pos = yPos*window->buffer->width + xPos; angle = PI2*0.75 + ((float)yd / (float)xd) * Turn8;
-          if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
-        // Render right, upward B (touches the top)
-        yPos = y - xd; pos = yPos*window->buffer->width + xPos; angle = PI*0.5 - ((float)yd / (float)xd) * Turn8;
-          if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
-        // Render left, upward B
-        xPos = x - yd; pos = yPos*window->buffer->width + xPos; angle = PI*0.5 + ((float)yd / (float)xd) * Turn8;
-          if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
-        // Render left, downward B
-        yPos = y + xd; pos = yPos*window->buffer->width + xPos; angle = PI2*0.75 - ((float)yd / (float)xd) * Turn8;
-          if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
-
-        // Adjust position.
-        yd += 1;
-        t1 += yd;
-        t2 = t1 - xd;
-
-        if (t2 >= 0)
-        { t1 = t2;
-          xd -= 1;
-        }
-      }
-
-      if (!window->isPixmap)
-      { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
-        wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
-        wl_surface_damage_buffer(window->surface, x-radius, y-radius, x+radius, y+radius); // INT32_MAX, INT32_MAX);
-        wl_surface_commit(window->surface);
-        //wl_display_flush(waylandState.display);
-        //wl_display_dispatch_pending(waylandState.display);
-      }
-
-      /* Option to step into an arc (unfinished).
-      Using these two formulas:
-        x^2 + y^2 = r^2
-        y = mx,  x = y/m,  m = y/x
-
-      Solve for x.
-        x^2 + y^2 = r^2
-        x^2 + (mx)^2 = r^2
-        x^2 + m^2*x^2 = r^2
-        (m^2+1)*x^2 = r^2
-        x^2 = r^2/(m^2+1)
-        x = sqrt(r^2/(m^2+1))
-
-      const float progress = startAngle == 0 ? 0.0 : (startAngle == Turn8 ? 1.0 : fmod(startAngle, Turn8));
-      const float initialSlope = progress / Turn8;
-      float initialX = !initialSlope ? radius : sqrt((radius*radius) / (initialSlope*initialSlope + 1.0)),
-        initialY = initialSlope * initialX;
-
-      intType pos = (y+yd)*window->buffer->width + x+xd,
-           maxPos = window->buffer->width * window->buffer->height;
-
-      while (angle <= sweepAngle)
-      { // Counter clockwise from the right: .--  ./  |  \.  --. etc.
-        if (pos < maxPos)
-          window->buffer->content[pos] = col;
-        //pos = (int)(y-xd)*window->buffer->width + x-yd;
-        //  window->buffer->content[pos] = col;
-        //pos = (int)(y-xd)*window->buffer->width + x+yd;
-        //  window->buffer->content[pos] = col;
-        //pos = (int)(y+yd)*window->buffer->width + x-xd;
-        //  window->buffer->content[pos] = col;
-        //pos = (int)(y-yd)*window->buffer->width + x-xd;
-        //  window->buffer->content[pos] = col;
-        //pos = (int)(y+xd)*window->buffer->width + x+yd;
-        //  window->buffer->content[pos] = col;
-        //pos = (int)(y+xd)*window->buffer->width + x-yd;
-        //  window->buffer->content[pos] = col;
-        //pos = (int)(y-yd)*window->buffer->width + x+xd;
-        //  window->buffer->content[pos] = col;
-        if (angle >= Turn8)
-          break;
-
-        if (slope < 1.0)
-        { yd -= 1.0;
-          // x^2 = r^2 - y^2  Therefore  x = sqrt(r^2 - y^2)
-          xd = sqrt(radius*radius - yd*yd);
-        }
-        else
-        { xd -= 1.0;
-          // y^2 = r^2 - x^2  Therefore  y = sqrt(r^2 - x^2)
-          yd = sqrt(radius*radius - xd*xd);
-        }
-        slope = yd && xd ? -yd/xd : 0;
-        pos = (y+yd)*window->buffer->width + x+xd;
-        // slope = progress / turn8  Therefore  progress = slope * turn8
-        angle = slope * Turn8;
-        printf("slope: %f  xd: %f  yd: %f\n", slope, xd, yd);
-      }*/
-    }
+      drawRawArc(window, x, y, radius, startAngle, sweepAngle, col);
   }
 }
 
@@ -892,7 +885,55 @@ void drwPFArc
   intType width,
   intType col
 )
-{}
+{
+  int dr;
+
+  logFunction(printf("drwPFArc(" FMT_U_MEM ", " FMT_D ", " FMT_D ", " FMT_D
+                       ", %.4f, %.4f, " FMT_D ", " F_X(08) ")\n",
+                       (memSizeType) actual_window, x, y, radius,
+                       startAngle, sweepAngle, width, col););
+  if (unlikely(radius < 0 || radius > UINT_MAX / 2 ||
+                 x < INT_MIN + radius || x > INT_MAX ||
+                 y < INT_MIN + radius || y > INT_MAX ||
+                 width < 1 || width > radius ||
+                 os_isnan(startAngle) || os_isnan(sweepAngle) ||
+                 startAngle < (floatType) INT_MIN / (23040.0 / (2.0 * PI)) ||
+                 startAngle > (floatType) INT_MAX / (23040.0 / (2.0 * PI)) ||
+                 sweepAngle < (floatType) INT_MIN / (23040.0 / (2.0 * PI)) ||
+                 sweepAngle > (floatType) INT_MAX / (23040.0 / (2.0 * PI))))
+  { logError(printf("drwPFArc(" FMT_U_MEM ", " FMT_D ", " FMT_D ", " FMT_D
+                    ", %.4f, %.4f, " FMT_D ", " F_X(08) "): "
+                    "Raises RANGE_ERROR\n",
+                    (memSizeType) actual_window, x, y, radius,
+                    startAngle, sweepAngle, width, col););
+   raise_error(RANGE_ERROR);
+  }
+  else
+  { way_winType window = (way_winType) actual_window;
+
+    if (prepare_buffer_copy(&waylandState, window))
+    { for (dr = 0; dr < width; dr++)
+      { drawRawArc(window, x, y, radius-dr, startAngle, sweepAngle, col);
+        // There's definitely a more efficient way to fill the gaps...
+        if (dr+1 < width)
+        { drawRawArc(window, x-1, y, radius-dr, startAngle, sweepAngle, col);
+          drawRawArc(window, x+1, y, radius-dr, startAngle, sweepAngle, col);
+          drawRawArc(window, x, y-1, radius-dr, startAngle, sweepAngle, col);
+          drawRawArc(window, x, y+1, radius-dr, startAngle, sweepAngle, col);
+        }
+      }
+
+      if (!window->isPixmap)
+      { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+        wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
+        wl_surface_damage_buffer(window->surface, x-radius, y-radius, x+radius, y+radius); // INT32_MAX, INT32_MAX);
+        wl_surface_commit(window->surface);
+        //wl_display_flush(waylandState.display);
+        //wl_display_dispatch_pending(waylandState.display);
+      }
+    }
+  }
+}
 
 // Unfinished.
 void drwPFArcChord
@@ -906,7 +947,7 @@ void drwPFArcChord
 )
 {}
 
-// Could likely be optimized.
+// Could likely be optimized (specifically in the gap-filling, as the whole extra line isn't necessary).
 void drwPFArcPieSlice
 ( const_winType actual_window,
   intType x,
@@ -921,7 +962,7 @@ void drwPFArcPieSlice
                        ", %.4f, %.4f, " F_X(08) ")\n",
                        (memSizeType) actual_window, x, y, radius,
                        startAngle, sweepAngle, col););
-  if (sweepAngle >= PI2)
+  if (sweepAngle >= PI2 || sweepAngle <= -PI2)
     drwPFCircle(actual_window, x, y, radius, col);
   else
   if
@@ -974,37 +1015,93 @@ void drwPFArcPieSlice
         t2 = 0,
         xd = radius,
         yd = 0;
-      // intType pos = 0, maxPos = window->buffer->width * window->buffer->height;
       intType xPos = 0, yPos = 0;
-      float angle = 0.0;
-      // printf("Start angle: %f   End angle: %f\n", startAngle, endAngle);
+      floatType angle = 0.0;
+      boolType drewPrior[8] = {false}; // Starts at the right, rotating counter-clockwise.
+      boolType xChanged = false;
 
       while (xd >= yd)
-      { // Using the coordinate, render the eight mirrored points when appropriate.
+      { // Using the coordinate, render the eight mirrored lines, when appropriate.
         // Render right, downward A (plunges from the middle)
         xPos = x + xd; yPos = y + yd; angle = PI2 - ((float)yd / (float)xd) * Turn8;
-          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
+          { drawRawLine(window, x, y, xPos, yPos, col);
+            if (xChanged && drewPrior[7]) // When both coordinates have changed, render an extra line to cover the gaps.
+              drawRawLine(window, x, y, xPos, yPos-1, col);
+            drewPrior[7] = true;
+          }
+          else
+            drewPrior[7] = false;
         // Render right, upward A (rises from the middle)
         yPos = y - yd; angle = ((float)yd / (float)xd) * Turn8;
-          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
+          { drawRawLine(window, x, y, xPos, yPos, col);
+            if (xChanged && drewPrior[0])
+              drawRawLine(window, x, y, xPos, yPos+1, col);
+            drewPrior[0] = true;
+          }
+          else
+            drewPrior[0] = false;
         // Render left, upward A
         xPos = x - xd; angle = PI - ((float)yd / (float)xd) * Turn8;
-          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
+          { drawRawLine(window, x, y, xPos, yPos, col);
+            if (xChanged && drewPrior[3])
+              drawRawLine(window, x, y, xPos, yPos+1, col);
+            drewPrior[3] = true;
+          }
+          else
+            drewPrior[3] = false;
         // Render left, downward A (these first four draw the "parenthesis" portion: ( )
         yPos = y + yd; angle = PI + ((float)yd / (float)xd) * Turn8;
-          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
+          { drawRawLine(window, x, y, xPos, yPos, col);
+            if (xChanged && drewPrior[4])
+              drawRawLine(window, x, y, xPos, yPos-1, col);
+            drewPrior[4] = true;
+          }
+          else
+            drewPrior[4] = false;
         // Render right, downard B (touches the bottom)
         xPos = x + yd; yPos = y + xd; angle = PI2*0.75 + ((float)yd / (float)xd) * Turn8;
-          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
+          { drawRawLine(window, x, y, xPos, yPos, col);
+            if (xChanged && drewPrior[6])
+              drawRawLine(window, x, y, xPos-1, yPos, col);
+            drewPrior[6] = true;
+          }
+          else
+            drewPrior[6] = false;
         // Render right, upward B (touches the top)
         yPos = y - xd; angle = PI*0.5 - ((float)yd / (float)xd) * Turn8;
-          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
+          { drawRawLine(window, x, y, xPos, yPos, col);
+            if (xChanged && drewPrior[1])
+              drawRawLine(window, x, y, xPos-1, yPos, col);
+            drewPrior[1] = true;
+          }
+          else
+            drewPrior[1] = false;
         // Render left, upward B
         xPos = x - yd; angle = PI*0.5 + ((float)yd / (float)xd) * Turn8;
-          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
+          { drawRawLine(window, x, y, xPos, yPos, col);
+            if (xChanged && drewPrior[2])
+              drawRawLine(window, x, y, xPos+1, yPos, col);
+            drewPrior[2] = true;
+          }
+          else
+            drewPrior[2] = false;
         // Render left, downward B
         yPos = y + xd; angle = PI2*0.75 - ((float)yd / (float)xd) * Turn8;
-          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
+          { drawRawLine(window, x, y, xPos, yPos, col);
+            if (xChanged && drewPrior[5])
+              drawRawLine(window, x, y, xPos+1, yPos, col);
+            drewPrior[5] = true;
+          }
+          else
+            drewPrior[5] = false;
 
         // Adjust position.
         yd += 1;
@@ -1014,34 +1111,23 @@ void drwPFArcPieSlice
         if (t2 >= 0)
         { t1 = t2;
           xd -= 1;
-
-          // When both coordinates change, render an extra line to cover the gaps.
-          // Render right, downward A (plunges from the middle)
-          xPos = x + xd; yPos = y + yd-1; angle = PI2 - ((float)yd / (float)xd) * Turn8;
-            if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
-          // Render right, upward A (rises from the middle)
-          yPos = y - yd+1; angle = ((float)yd / (float)xd) * Turn8;
-            if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
-          // Render left, upward A
-          xPos = x - xd; angle = PI - ((float)yd / (float)xd) * Turn8;
-            if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
-          // Render left, downward A (these first four draw the "parenthesis" portion: ( )
-          yPos = y + yd-1; angle = PI + ((float)yd / (float)xd) * Turn8;
-            if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
-          // Render right, downard B (touches the bottom)
-          xPos = x + yd-1; yPos = y + xd; angle = PI2*0.75 + ((float)yd / (float)xd) * Turn8;
-            if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
-          // Render right, upward B (touches the top)
-          yPos = y - xd; angle = PI*0.5 - ((float)yd / (float)xd) * Turn8;
-            if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
-          // Render left, upward B
-          xPos = x - yd+1; angle = PI*0.5 + ((float)yd / (float)xd) * Turn8;
-            if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
-          // Render left, downward B
-          yPos = y + xd; angle = PI2*0.75 - ((float)yd / (float)xd) * Turn8;
-            if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle)) drwLineRaw(actual_window, x, y, xPos, yPos, col);
+          xChanged = true;
         }
+        else
+          xChanged = false;
       }
+
+      // Fill in the gaps between the diagonal octant joins.
+      xd = sqrt((radius*radius) / 2.0),
+      yd = xd;
+      if (drewPrior[0] && drewPrior[1])
+        drawRawLine(window, x, y, x+xd, y-yd, col);
+      if (drewPrior[2] && drewPrior[3])
+        drawRawLine(window, x, y, x-xd, y-yd, col);
+      if (drewPrior[4] && drewPrior[5])
+        drawRawLine(window, x, y, x-xd, y+yd, col);
+      if (drewPrior[6] && drewPrior[7])
+        drawRawLine(window, x, y, x+xd, y+yd, col);
 
       if (!window->isPixmap)
       { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
@@ -1178,7 +1264,7 @@ void drwPLine (const_winType actual_window, intType x1, intType y1, intType x2, 
   { way_winType window = (way_winType) actual_window;
 
     if (prepare_buffer_copy(&waylandState, window))
-    { drwLineRaw(actual_window, x1, y1, x2, y2, col);
+    { drawRawLine(window, x1, y1, x2, y2, col);
 
       if (!window->isPixmap)
       { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
