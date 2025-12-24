@@ -217,243 +217,11 @@ void drwFlush (void)
   wl_display_flush(waylandState.display); // Returns -1 if it wasn't able to send all data.
 }
 
-/*- Secondary Drawing Functions --------
+/*- Raw Drawing Functions --------------
+These assume that a buffer has all ready
+been prepared; and they do not message
+Wayland.
 --------------------------------------*/
-/* Needed?
-boolType gkbButtonPressed (charType button);
-intType gkbClickedXpos (void);
-intType gkbClickedYpos (void);
-charType gkbGetc (void);
-boolType gkbInputReady (void);
-charType gkbRawGetc (void);
-void gkbSelectInput (winType aWindow, charType aKey, boolType active);
-winType gkbWindow (void);
-*/
-
-// Unfinished.
-void drwArc
-( const_winType actual_window,
-  intType x,
-  intType y,
-  intType radius,
-  floatType startAngle,
-  floatType sweepAngle
-)
-{}
-
-// Unfinishied.
-void drwArc2
-( const_winType actual_window,
-  intType x1,
-  intType y1,
-  intType x2,
-  intType y2,
-  intType radius
-)
-{}
-
-// Unfinished.
-rtlArrayType drwBorder (const_winType actual_window)
-{
-  rtlArrayType border = NULL;
-  return border;
-}
-
-// Unfinished.
-winType drwCapture (intType left, intType upper, intType width, intType height)
-{
-  puts("Draw capture.");
-  way_winType pixmap = NULL;
-  return (winType) pixmap;
-}
-
-// Unfinished.
-void drwClear (winType actual_window, intType col)
-{
-  if (!init_called)
-    drawInit();
-
-  way_winType window = (way_winType) actual_window;
-  printf("Clear color: %ld\n", col);
-
-  if (prepare_buffer_data(&waylandState, window))
-  { // Could use memset instead?
-    for (int pos = 0; pos < window->buffer->width * window->buffer->height; pos++)
-      window->buffer->content[pos] = col;
-
-    if (!window->isPixmap)
-    { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
-      wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
-      wl_surface_damage_buffer(window->surface, 0, 0, window->buffer->width, window->buffer->height); // INT32_MAX, INT32_MAX);
-      wl_surface_commit(window->surface);
-      wl_display_flush(waylandState.display);
-      wl_display_dispatch_pending(waylandState.display);
-    }
-  }
-}
-
-void drwColor (intType col)
-{}
-
-// Copied from drw_emc.c
-rtlArrayType drwConvPointList (const const_bstriType pointList)
-{
-  memSizeType numCoords;
-  int *coords;
-  memSizeType pos;
-  rtlArrayType xyArray;
-
-  /* drwConvPointList */
-  logFunction(printf("drwConvPointList(\"%s\")\n",
-                     bstriAsUnquotedCStri(pointList)););
-  numCoords = pointList->size / sizeof(int);
-  if (unlikely(!ALLOC_RTL_ARRAY(xyArray, numCoords))) {
-    raise_error(MEMORY_ERROR);
-  } else {
-    xyArray->min_position = 1;
-    xyArray->max_position = (intType) numCoords;
-    coords = (int *) pointList->mem;
-    for (pos = 0; pos < numCoords; pos ++) {
-      xyArray->arr[pos].value.intValue = (intType) coords[pos];
-    } /* for */
-  } /* if */
-  logFunction(printf("drwConvPointList --> arr (size=" FMT_U_MEM ")\n",
-                     arraySize(xyArray)););
-  return xyArray;
-} /* drwConvPointList */
-
-// Unfinished.
-void drwCopyArea
-( const_winType src_window,
-  const_winType dest_window,
-  intType src_x,
-  intType src_y,
-  intType width,
-  intType height,
-  intType dest_x,
-  intType dest_y
-)
-{
-  puts("Draw copy area.");
-}
-
-// Unfinished?
-winType drwEmpty (void)
-{
-  return globalEmptyWindow;
-}
-
-void drwFArcChord
-( const_winType actual_window,
-  intType x,
-  intType y,
-  intType radius,
-  floatType startAngle,
-  floatType sweepAngle
-)
-{}
-
-void drwFCircle (const_winType actual_window, intType x, intType y, intType radius)
-{}
-
-void drwFEllipse (const_winType actual_window, intType x, intType y, intType width, intType height)
-{}
-
-// Unfinished.
-void drwFPolyLine (const_winType actual_window, intType x, intType y, bstriType point_list, intType col)
-{}
-
-// Copied from drw_emc.c
-bstriType drwGenPointList (const const_rtlArrayType xyArray)
-{
-  memSizeType num_elements;
-  memSizeType len;
-  int *coords;
-  memSizeType pos;
-  bstriType result;
-
-  /* drwGenPointList */
-  logFunction(printf("drwGenPointList(" FMT_D " .. " FMT_D ")\n",
-                     xyArray->min_position, xyArray->max_position););
-  num_elements = arraySize(xyArray);
-  if (unlikely(num_elements & 1)) {
-    raise_error(RANGE_ERROR);
-    result = NULL;
-  } else {
-    len = num_elements >> 1;
-    if (unlikely(len > MAX_BSTRI_LEN / (sizeof(int) << 1) || len > MAX_MEM_INDEX)) {
-      raise_error(MEMORY_ERROR);
-      result = NULL;
-    } else {
-      if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, len * (sizeof(int) << 1)))) {
-        raise_error(MEMORY_ERROR);
-      } else {
-        result->size = len * (sizeof(int) << 1);
-        if (len > 0) {
-          coords = (int *) result->mem;
-          for (pos = 0; pos < len << 1; pos++) {
-            coords[pos] = castToLong(xyArray->arr[pos].value.intValue);
-          } /* for */
-        } /* if */
-      } /* if */
-    } /* if */
-  } /* if */
-  return result;
-} /* drwGenPointList */
-
-intType drwGetPixel (const_winType sourceWindow, intType x, intType y)
-{
-  way_winType window = (way_winType) sourceWindow;
-
-  if (window && window->buffer && window->buffer->content)
-  { int pos = y * window->buffer->width + x;
-
-    if (pos < window->buffer->width * window->buffer->height)
-    { intType result = window->buffer->content[pos];
-
-      // FF 00 00 00 = 4278190080
-      // Shift the first three bytes off (3*8 = 24) then negate the 4th byte (which is the alpha).
-      return AlphaEnabled ? result : result ^ result >> 24 << 24; // Necessary?
-    }
-  }
-
-  return 0;
-}
-
-// Unfinished.
-bstriType drwGetPixelData (const_winType sourceWindow)
-{
-  puts("Draw get pixel data called.");
-  bstriType result = NULL;
-  return result;
-}
-
-// Unfinished.
-winType drwGetPixmap
-( const_winType sourceWindow,
-  intType left,
-  intType upper,
-  intType width,
-  intType height
-)
-{
-  way_winType pixmap = NULL;
-  return (winType) pixmap;
-}
-
-intType drwHeight (const_winType actual_window)
-{
-  return ((way_winType) actual_window)->height;
-}
-
-// Unfinished.
-winType drwImage (int32Type *image_data, memSizeType width, memSizeType height, boolType hasAlphaChannel)
-{
-  way_winType pixmap = NULL;
-  return (winType) pixmap;
-}
-
-// Assumes the buffer is all ready prepared, and doesn't message wayland.
 void drawRawLine (way_winType window, intType x1, intType y1, intType x2, intType y2, intType col)
 {
   /* Utilizing the slope-intercept formula:
@@ -572,34 +340,6 @@ void drawRawLine (way_winType window, intType x1, intType y1, intType x2, intTyp
         break;
     } while (z <= limit);
   }*/
-}
-
-// Unfinished.
-winType drwNewPixmap (intType width, intType height)
-{
-  puts("drwNewPixmap called.");
-  way_winType pixmap = NULL;
-
-  if (unlikely(!inIntRange(width) || !inIntRange(height) || width < 1 || height < 1))
-    raise_error(RANGE_ERROR);
-  else
-  { if (!init_called)
-      drawInit();
-
-    if (unlikely(!ALLOC_RECORD2(pixmap, way_winRecord, count.win, count.win_bytes)))
-      raise_error(MEMORY_ERROR);
-    else
-    { memset(pixmap, 0, sizeof(way_winRecord));
-      pixmap->usage_count = 1;
-      pixmap->isPixmap = TRUE;
-      pixmap->width = width;
-      pixmap->height = height;
-      pixmap->buffer = NULL;
-      // printf("  address: %p\n", pixmap);
-    }
-  }
-
-  return (winType) pixmap;
 }
 
 // Could likey be optimized.
@@ -747,7 +487,354 @@ void drawRawArc
   }*/
 }
 
-// Could likey be optimized.
+/*- Secondary Drawing Functions --------
+--------------------------------------*/
+/* Needed?
+boolType gkbButtonPressed (charType button);
+intType gkbClickedXpos (void);
+intType gkbClickedYpos (void);
+charType gkbGetc (void);
+boolType gkbInputReady (void);
+charType gkbRawGetc (void);
+void gkbSelectInput (winType aWindow, charType aKey, boolType active);
+winType gkbWindow (void);
+*/
+
+// Unfinished.
+rtlArrayType drwBorder (const_winType actual_window)
+{
+  rtlArrayType border = NULL;
+  return border;
+}
+
+// Unfinished.
+winType drwCapture (intType left, intType upper, intType width, intType height)
+{
+  puts("Draw capture.");
+  way_winType pixmap = NULL;
+  return (winType) pixmap;
+}
+
+// Unfinished.
+void drwClear (winType actual_window, intType col)
+{
+  if (!init_called)
+    drawInit();
+
+  way_winType window = (way_winType) actual_window;
+  printf("Clear color: %ld\n", col);
+
+  if (prepare_buffer_data(&waylandState, window))
+  { // Could use memset instead?
+    for (int pos = 0; pos < window->buffer->width * window->buffer->height; pos++)
+      window->buffer->content[pos] = col;
+
+    if (!window->isPixmap)
+    { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+      wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
+      wl_surface_damage_buffer(window->surface, 0, 0, window->buffer->width, window->buffer->height); // INT32_MAX, INT32_MAX);
+      wl_surface_commit(window->surface);
+      wl_display_flush(waylandState.display);
+      wl_display_dispatch_pending(waylandState.display);
+    }
+  }
+}
+
+void drwColor (intType col)
+{}
+
+// Copied from drw_emc.c
+rtlArrayType drwConvPointList (const const_bstriType pointList)
+{
+  memSizeType numCoords;
+  int *coords;
+  memSizeType pos;
+  rtlArrayType xyArray;
+
+  /* drwConvPointList */
+  logFunction(printf("drwConvPointList(\"%s\")\n",
+                     bstriAsUnquotedCStri(pointList)););
+  numCoords = pointList->size / sizeof(int);
+  if (unlikely(!ALLOC_RTL_ARRAY(xyArray, numCoords))) {
+    raise_error(MEMORY_ERROR);
+  } else {
+    xyArray->min_position = 1;
+    xyArray->max_position = (intType) numCoords;
+    coords = (int *) pointList->mem;
+    for (pos = 0; pos < numCoords; pos ++) {
+      xyArray->arr[pos].value.intValue = (intType) coords[pos];
+    } /* for */
+  } /* if */
+  logFunction(printf("drwConvPointList --> arr (size=" FMT_U_MEM ")\n",
+                     arraySize(xyArray)););
+  return xyArray;
+} /* drwConvPointList */
+
+// Unfinished.
+void drwCopyArea
+( const_winType src_window,
+  const_winType dest_window,
+  intType src_x,
+  intType src_y,
+  intType width,
+  intType height,
+  intType dest_x,
+  intType dest_y
+)
+{
+  puts("Draw copy area.");
+}
+
+// Unfinished?
+winType drwEmpty (void)
+{
+  return globalEmptyWindow;
+}
+
+void drwFPolyLine (const_winType actual_window, intType x, intType y, bstriType point_list, intType col)
+{
+  int *coords;
+  memSizeType numCoords, point;
+  intType left, right, top, bottom,
+    y0, x1,y1, x2,y2, y3;
+  intType xPos, yPos, pos, maxPos;
+  float slope;
+  bool countCorner, contained;
+
+  logFunction(printf("drwFPolyLine(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                     ", " FMT_U_MEM ", " F_X(08) ")\n",
+                     (memSizeType) actual_window, x, y,
+                     (memSizeType) point_list, col););
+  if (unlikely(!inShortRange(x) || !inShortRange(y)))
+  { logError(printf("drwFPolyLine(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                    ", " FMT_U_MEM ", " F_X(08) "): "
+                    "Raises RANGE_ERROR\n",
+                    (memSizeType) actual_window, x, y,
+                    (memSizeType) point_list, col););
+    raise_error(RANGE_ERROR);
+  }
+  else
+  { coords = (int *) point_list->mem;
+    numCoords = point_list->size / sizeof(int);
+    float slopes[numCoords/2];
+
+    if (numCoords >= 4)
+    { way_winType window = (way_winType) actual_window;
+      if (prepare_buffer_copy(&waylandState, window))
+      { // Find the bounds and the slopes, and draw the outline.
+        left = x+coords[0]; right = left;
+        top = y+coords[1]; bottom = top;
+        slopes[0] = (float)(coords[numCoords-1]-coords[1]) / (float)(coords[numCoords-2]-coords[0]);
+        for (point = 2; point+1 < numCoords; point+=2)
+        { x1 = x+coords[point-2];
+          y1 = y+coords[point-1];
+          x2 = x+coords[point];
+          y2 = y+coords[point+1];
+          drawRawLine(window, x1, y1, x2, y2, col);
+          if (x1 < left) left = x1;
+          else if (x1 > right) right = x1;
+          if (x2 < left) left = x2;
+          else if (x2 > right) right = x2;
+          if (y1 < top) top = y1;
+          else if (y1 > bottom) bottom = y1;
+          if (y2 < top) top = y2;
+          else if (y2 > bottom) bottom = y2;
+          slopes[point/2] = (float)(y1-y2) / (float)(x1-x2);
+        }
+
+        // Fill the polygon utilizing the even-odd rule.
+        if (numCoords >= 6) // No need for more work if only a line is being drawn.
+        { maxPos = window->buffer->width * window->buffer->height;
+
+          for (yPos = top; yPos < bottom; yPos++)
+            for (xPos = left, pos = yPos * window->buffer->width + xPos; xPos < right; xPos++, pos++)
+              if (pos < maxPos)
+              { // Check to see if the point is within the polygon.
+                contained = false;
+                for (point = 0, countCorner = false; point+1 < numCoords; point+=2, countCorner = !countCorner)
+                { // For the first point, join from the last point.
+                  if (point == 0)
+                  { x1 = x+coords[numCoords-2];
+                    y1 = y+coords[numCoords-1];
+                    x2 = x+coords[point];
+                    y2 = y+coords[point+1];
+                  }
+                  else
+                  { x1 = x+coords[point-2];
+                    y1 = y+coords[point-1];
+                    x2 = x+coords[point];
+                    y2 = y+coords[point+1];
+                  }
+                  slope = slopes[point/2];
+                  if // Check for intersection.
+                  ( (y1 <= yPos && y2 >= yPos || y2 <= yPos && y1 >= yPos) &&
+                    ( !slope && (x1 >= xPos || x2 >= xPos) ||
+                      // y = mx   x = y/m
+                      slope && xPos-x1 <= (float)(yPos-y1) / slope
+                    ) &&
+                    (countCorner || yPos != y1 && yPos != y2)
+                  )
+                  { // Get the adjacent y's to the both y1 and y2.
+                    if (point == 0)
+                    { y0 = y+coords[numCoords-3];
+                      y3 = y+coords[point+3];
+                    }
+                    else
+                    { if (point >= 4)
+                        y0 = y+coords[point-3];
+                      else
+                        y0 = y+coords[numCoords-(3-point)];
+                      if (point+3 < numCoords)
+                        y3 = y+coords[point+3];
+                      else
+                        y3 = y+coords[1];
+                    }
+                    /* Only count when not a corner point, or when both segments connected to the corner
+                    lie on the same side (y) of the ray. */
+                    if
+                    ( (yPos != y1 || (y2 < y1) != (y0 < y1)) &&
+                      (yPos != y2 || (y1 < y2) != (y3 < y2))
+                    )
+                      contained = !contained;
+                  }
+                }
+                // If the ray has intersected an odd number of segments in the polygon.
+                if (contained)
+                  window->buffer->content[pos] = col;
+              }
+        }
+
+        if (!window->isPixmap)
+        { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+          wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
+          wl_surface_damage_buffer(window->surface, left, top, right-left, bottom-top); // INT32_MAX, INT32_MAX);
+          wl_surface_commit(window->surface);
+          // wl_display_flush(waylandState.display);
+          // wl_display_dispatch_pending(waylandState.display);
+        }
+      }
+    }
+  }
+}
+
+// Copied from drw_emc.c
+bstriType drwGenPointList (const const_rtlArrayType xyArray)
+{
+  memSizeType num_elements;
+  memSizeType len;
+  int *coords;
+  memSizeType pos;
+  bstriType result;
+
+  /* drwGenPointList */
+  logFunction(printf("drwGenPointList(" FMT_D " .. " FMT_D ")\n",
+                     xyArray->min_position, xyArray->max_position););
+  num_elements = arraySize(xyArray);
+  if (unlikely(num_elements & 1)) {
+    raise_error(RANGE_ERROR);
+    result = NULL;
+  } else {
+    len = num_elements >> 1;
+    if (unlikely(len > MAX_BSTRI_LEN / (sizeof(int) << 1) || len > MAX_MEM_INDEX)) {
+      raise_error(MEMORY_ERROR);
+      result = NULL;
+    } else {
+      if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, len * (sizeof(int) << 1)))) {
+        raise_error(MEMORY_ERROR);
+      } else {
+        result->size = len * (sizeof(int) << 1);
+        if (len > 0) {
+          coords = (int *) result->mem;
+          for (pos = 0; pos < len << 1; pos++) {
+            coords[pos] = castToLong(xyArray->arr[pos].value.intValue);
+          } /* for */
+        } /* if */
+      } /* if */
+    } /* if */
+  } /* if */
+  return result;
+} /* drwGenPointList */
+
+intType drwGetPixel (const_winType sourceWindow, intType x, intType y)
+{
+  way_winType window = (way_winType) sourceWindow;
+
+  if (window && window->buffer && window->buffer->content)
+  { int pos = y * window->buffer->width + x;
+
+    if (pos < window->buffer->width * window->buffer->height)
+    { intType result = window->buffer->content[pos];
+
+      // FF 00 00 00 = 4278190080
+      // Shift the first three bytes off (3*8 = 24) then negate the 4th byte (which is the alpha).
+      return AlphaEnabled ? result : result ^ result >> 24 << 24; // Necessary?
+    }
+  }
+
+  return 0;
+}
+
+// Unfinished.
+bstriType drwGetPixelData (const_winType sourceWindow)
+{
+  puts("Draw get pixel data called.");
+  bstriType result = NULL;
+  return result;
+}
+
+// Unfinished.
+winType drwGetPixmap
+( const_winType sourceWindow,
+  intType left,
+  intType upper,
+  intType width,
+  intType height
+)
+{
+  way_winType pixmap = NULL;
+  return (winType) pixmap;
+}
+
+intType drwHeight (const_winType actual_window)
+{
+  return ((way_winType) actual_window)->height;
+}
+
+// Unfinished.
+winType drwImage (int32Type *image_data, memSizeType width, memSizeType height, boolType hasAlphaChannel)
+{
+  way_winType pixmap = NULL;
+  return (winType) pixmap;
+}
+
+// Unfinished.
+winType drwNewPixmap (intType width, intType height)
+{
+  puts("drwNewPixmap called.");
+  way_winType pixmap = NULL;
+
+  if (unlikely(!inIntRange(width) || !inIntRange(height) || width < 1 || height < 1))
+    raise_error(RANGE_ERROR);
+  else
+  { if (!init_called)
+      drawInit();
+
+    if (unlikely(!ALLOC_RECORD2(pixmap, way_winRecord, count.win, count.win_bytes)))
+      raise_error(MEMORY_ERROR);
+    else
+    { memset(pixmap, 0, sizeof(way_winRecord));
+      pixmap->usage_count = 1;
+      pixmap->isPixmap = TRUE;
+      pixmap->width = width;
+      pixmap->height = height;
+      pixmap->buffer = NULL;
+      // printf("  address: %p\n", pixmap);
+    }
+  }
+
+  return (winType) pixmap;
+}
+
 void drwPArc
 ( const_winType actual_window,
   intType x,
@@ -762,7 +849,7 @@ void drwPArc
                        ", %.4f, %.4f, " F_X(08) ")\n",
                        (memSizeType) actual_window, x, y, radius,
                        startAngle, sweepAngle, col););
-  if (sweepAngle >= PI2)
+  if (sweepAngle >= PI2 || sweepAngle < -PI2)
     drwPCircle(actual_window, x, y, radius, col);
   else
   if
@@ -989,32 +1076,34 @@ void drwPFArcPieSlice
       As we are dealing with radians, 2 * PI is a full turn (or 360 degrees).
       Jesko's method works with 1/8 turns. */
       const float Turn8 = PI2 / 8.0;
-      boolType crossingBound = false;
-      startAngle = fmod(startAngle, PI2);
-      if (startAngle < 0)
+      boolType crossingBound = false; // Used to control how we compare to the start/end angles.
+      startAngle = fmod(startAngle, PI2); // Discard full turns.
+      if (startAngle < 0) // When negative, find the corresponding positive angle.
         startAngle += PI2;
-      floatType endAngle = startAngle + sweepAngle;
-      if (endAngle < 0)
+      floatType endAngle = startAngle + sweepAngle; // Sweep to end.
+      if (endAngle < 0) // When negative, find corresponding, but also note that we are crossing the "bound" (being zero).
       { crossingBound = true;
         endAngle += PI2;
       }
       else
-      if (endAngle > PI2)
+      if (endAngle > PI2) // Also crossing the bound when the end is greater than a full turn.
       { crossingBound = true;
         endAngle = fmod(endAngle, PI2);
       }
 
-      // Ensure the start angle is earlier in the arc.
+      // Ensure the start angle is earlier in the arc (for our later angle checks).
       if (startAngle > endAngle)
       { floatType tempAngle = endAngle;
         endAngle = startAngle;
         startAngle = tempAngle;
       }
 
+      // Set up Jesko's variables.
       intType t1 = radius / 16, // This division makes for a smoother edge.
         t2 = 0,
         xd = radius,
         yd = 0;
+      // And some of our own.
       intType xPos = 0, yPos = 0;
       floatType angle = 0.0;
       boolType drewPrior[8] = {false}; // Starts at the right, rotating counter-clockwise.
@@ -1026,7 +1115,8 @@ void drwPFArcPieSlice
         xPos = x + xd; yPos = y + yd; angle = PI2 - ((float)yd / (float)xd) * Turn8;
           if (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))
           { drawRawLine(window, x, y, xPos, yPos, col);
-            if (xChanged && drewPrior[7]) // When both coordinates have changed, render an extra line to cover the gaps.
+            // When both coordinates have changed, render an extra line to cover the gaps.
+            if (xChanged && drewPrior[7])
               drawRawLine(window, x, y, xPos, yPos-1, col);
             drewPrior[7] = true;
           }
@@ -1117,7 +1207,9 @@ void drwPFArcPieSlice
           xChanged = false;
       }
 
-      // Fill in the gaps between the diagonal octant joins.
+      /* Fill in the gaps between the diagonal octant joins. These get missed in the main loop due
+      to these lines existing between the last lines drawn. The extra orthogonal lines aren't needed
+      because, the straight lines leave no gaps. */
       xd = sqrt((radius*radius) / 2.0),
       yd = xd;
       if (drewPrior[0] && drewPrior[1])
@@ -1294,10 +1386,60 @@ intType drwPointerYpos (const_winType actual_window)
   return 0;
 }
 
-// Unfinished.
 void drwPolyLine (const_winType actual_window, intType x, intType y, bstriType point_list, intType col)
 {
-  puts("DrwPolyLine called.");
+  int *coords;
+  memSizeType numCoords, point;
+  intType left = x, right = x, top = y, bottom = y,
+    x1, y1, x2, y2;
+
+  logFunction(printf("drwPolyLine(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                     ", " FMT_U_MEM ", " F_X(08) ")\n",
+                     (memSizeType) actual_window, x, y,
+                     (memSizeType) point_list, col););
+  if (unlikely(!inShortRange(x) || !inShortRange(y)))
+  { logError(printf("drwPolyLine(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                    ", " FMT_U_MEM ", " F_X(08) "): "
+                    "Raises RANGE_ERROR\n",
+                    (memSizeType) actual_window, x, y,
+                    (memSizeType) point_list, col););
+    raise_error(RANGE_ERROR);
+  }
+  else
+  { coords = (int *) point_list->mem;
+    numCoords = point_list->size / sizeof(int);
+
+    if (numCoords >= 4)
+    { way_winType window = (way_winType) actual_window;
+      if (prepare_buffer_copy(&waylandState, window))
+      { // Every line is drawn from the last point, relative to the given x and y.
+        for (point = 2; point+1 < numCoords; point+=2)
+        { x1 = x+coords[point-2];
+          y1 = y+coords[point-1];
+          x2 = x+coords[point];
+          y2 = y+coords[point+1];
+          drawRawLine(window, x1, y1, x2, y2, col);
+          if (x1 < left) left = x1;
+          else if (x1 > right) right = x1;
+          if (x2 < left) left = x2;
+          else if (x2 > right) right = x2;
+          if (y1 < top) top = y1;
+          else if (y1 > bottom) bottom = y1;
+          if (y2 < top) top = y2;
+          else if (y2 > bottom) bottom = y2;
+        }
+
+        if (!window->isPixmap)
+        { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+          wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
+          wl_surface_damage_buffer(window->surface, left, top, right-left, bottom-top); // INT32_MAX, INT32_MAX);
+          wl_surface_commit(window->surface);
+          // wl_display_flush(waylandState.display);
+          // wl_display_dispatch_pending(waylandState.display);
+        }
+      }
+    }
+  }
 }
 
 // Unfinished.
