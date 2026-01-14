@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /*#include "stdio.h"
 #include "limits.h"*/
@@ -220,8 +221,15 @@ void drwFlush (void)
 /*- Raw Drawing Functions --------------
 These assume that a buffer has all ready
 been prepared; and they do not message
-Wayland.
+the Wayland server.
 --------------------------------------*/
+void drawRawPoint (way_winType window, intType x, intType y, intType col)
+{
+  intType pos = y*window->buffer->width + x;
+  if (pos < window->buffer->width * window->buffer->height)
+    window->buffer->content[pos] = col;
+}
+
 void drawRawLine (way_winType window, intType x1, intType y1, intType x2, intType y2, intType col)
 {
   /* Utilizing the slope-intercept formula:
@@ -539,9 +547,6 @@ void drwClear (winType actual_window, intType col)
     }
   }
 }
-
-void drwColor (intType col)
-{}
 
 // Copied from drw_emc.c
 rtlArrayType drwConvPointList (const const_bstriType pointList)
@@ -961,7 +966,6 @@ void drwPCircle (const_winType actual_window, intType x, intType y, intType radi
   }
 }
 
-// Unfinished.
 void drwPFArc
 ( const_winType actual_window,
   intType x,
@@ -1022,7 +1026,8 @@ void drwPFArc
   }
 }
 
-// Unfinished.
+// Unfinished (should tie in with jesko's method to produce a shape similar to other arcs/circles).
+// Renders a circle, but skips the area outside the line formed by start and end angle.
 void drwPFArcChord
 ( const_winType actual_window,
   intType x,
@@ -1032,7 +1037,185 @@ void drwPFArcChord
   floatType sweepAngle,
   intType col
 )
-{}
+{
+  logFunction(printf("drwPFArcChord(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                     ", " FMT_D ", %.4f, %.4f, " F_X(08) ")\n",
+                     (memSizeType) actual_window, x, y, radius,
+                     startAngle, sweepAngle, col););
+  if (!sweepAngle || sweepAngle >= PI2 || sweepAngle <= -PI2)
+    drwPFCircle(actual_window, x, y, radius, col);
+  else
+  if (unlikely(radius < 0 || radius > UINT_MAX / 2 ||
+               x < INT_MIN + radius || x > INT_MAX ||
+               y < INT_MIN + radius || y > INT_MAX ||
+               os_isnan(startAngle) || os_isnan(sweepAngle) ||
+               startAngle < (floatType) INT_MIN / (23040.0 / (2.0 * PI)) ||
+               startAngle > (floatType) INT_MAX / (23040.0 / (2.0 * PI)) ||
+               sweepAngle < (floatType) INT_MIN / (23040.0 / (2.0 * PI)) ||
+               sweepAngle > (floatType) INT_MAX / (23040.0 / (2.0 * PI))))
+  { logError(printf("drwPFArcChord(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                    ", " FMT_D ", %.4f, %.4f, " F_X(08) "): "
+                    "Raises RANGE_ERROR\n",
+                    (memSizeType) actual_window, x, y, radius,
+                    startAngle, sweepAngle, col););
+    raise_error(RANGE_ERROR);
+  }
+  else
+  { way_winType window = (way_winType) actual_window;
+
+    if (prepare_buffer_copy(&waylandState, window))
+    { /* Angles are given as radians. Start angle of 0 is right, sweeps counter-clockwise.
+      As we are dealing with radians, 2 * PI is a full turn (or 360 degrees). */
+      boolType crossingBound = false;
+      startAngle = fmod(startAngle, PI2);
+      if (startAngle < 0)
+        startAngle += PI2;
+      floatType endAngle = startAngle + sweepAngle;
+      if (endAngle < 0)
+      { crossingBound = true;
+        endAngle += PI2;
+      }
+      else
+      if (endAngle > PI2)
+      { crossingBound = true;
+        endAngle = fmod(endAngle, PI2);
+      }
+      // printf("Start: %.10f  End: %.10f  Crossing: %d\n", startAngle, endAngle, crossingBound);
+
+      // Ensure the start angle is earlier in the arc.
+      if (startAngle > endAngle)
+      { floatType tempAngle = endAngle;
+        endAngle = startAngle;
+        startAngle = tempAngle;
+      }
+
+      const float Turn4 = PI/2.0;
+      float slope;
+      int x1, y1, x2, y2, posSign = -1; // Default is to fill above the line.
+      intType xPos, yPos, pos, intercept;
+      const intType maxPos = window->buffer->width * window->buffer->height;
+      // printf("45: %f  90: %f  135: %f  225: %f  335: %f\n", tanf(Turn4/2.0), tanf(Turn4), tanf(Turn4*1.5), tanf(Turn4*2.5), tanf(Turn4*3.5));
+
+      // Find point A.
+      // Need to handle values very close to Turn4 due to floating point rounding issues.
+      if (fabs(Turn4-fmod(startAngle,Turn4)) < 0.000001) // Slopeless angle.
+      { if (startAngle < 1.0 || startAngle > PI2-1.0) // 0
+        { x1 = radius;
+          y1 = 0;
+        }
+        else
+        if (startAngle < PI - 1.0) // Turn4
+        { x1 = 0;
+          y1 = -radius;
+        }
+        else
+        if (startAngle < PI + Turn4 - 1.0) // PI
+        { x1 = -radius;
+          y1 = 0;
+        }
+        else // PI + Turn4
+        { x1 = 0;
+          y1 = radius;
+        }
+      }
+      else
+      { slope = -tanf(startAngle);
+        // printf("slope1: %.10f\n", slope);
+        x1 = !slope ? radius : sqrt((float)(radius*radius) / (slope*slope + 1.0));
+        if (startAngle > Turn4 && startAngle < PI*1.5)
+          x1 = -x1;
+        y1 = slope * (float)x1;
+      }
+
+      // Find point B.
+      if (fabs(Turn4-fmod(endAngle,Turn4)) < 0.000001) // Slopeless angle.
+      { if (endAngle < 1.0 || endAngle > PI2-1.0) // 0
+        { x2 = radius;
+          y2 = 0;
+        }
+        else
+        if (endAngle < PI - 1.0) // Turn4
+        { x2 = 0;
+          y2 = -radius;
+        }
+        else
+        if (endAngle < PI + Turn4 - 1.0) // PI
+        { x2 = -radius;
+          y2 = 0;
+        }
+        else // PI + Turn4
+        { x2 = 0;
+          y2 = radius;
+        }
+      }
+      else
+      { slope = -tanf(endAngle); // We want positive slope to indicate a slant of (\)
+        // printf("slope2: %.10f\n", slope);
+        x2 = !slope ? radius : sqrt((float)(radius*radius) / (slope*slope + 1.0));
+        if (endAngle > Turn4 && endAngle < PI*1.5)
+          x2 = -x2;
+        y2 = slope * (float)x2;
+      }
+
+      // Slope of A to B.
+      slope = x2-x1 ? (float)(y2-y1)/(float)(x2-x1) : 0.0;
+      xPos = x;// - radius;
+      yPos = y;// - radius;
+      if (slope)
+        intercept = (-y1 / slope) + x1;
+
+      // Determine whether or not to fill below the line.
+      if (slope)
+      { if (slope > 0)
+        { if (!crossingBound && startAngle >= Turn4)
+            posSign = 1; // Fill below the line.
+        }
+        else
+        if (crossingBound || startAngle >= PI)
+          posSign = 1;
+      }
+      else // Horizontal line.
+      if (y1 == y2)
+      { if (crossingBound == (startAngle < PI))
+          posSign = 1; // Fill below the line.
+      }
+      else // Vertical line
+      if (crossingBound)
+        posSign = 1; // Fill to the right.
+
+      // printf("startAngle: %f  sweep: %f  end: %f  Turn4: %.10f  slope: %.10f  intercept: %ld  fmod: %.10f  div: %.10f  ex: %.10f\n", startAngle, sweepAngle, endAngle, Turn4, slope, intercept, fmod(startAngle, Turn4), startAngle/Turn4, fabs(Turn4-fmod(startAngle,Turn4)));
+      // printf("x1: %d y1: %d   x2: %d y2: %d  sign: %d\n", x1, y1, x2, y2, posSign);
+
+      for (int yd = -radius; yd <= radius; yd++)
+        for (int xd = -radius; xd <= radius; xd++)
+        { pos = (yPos + yd)*window->buffer->width + (xPos + xd);
+          if (pos <= maxPos && xd*xd + yd*yd <= radius*radius)
+          { if (slope)// y = mx + b
+            { if (posSign == 1 && yd >= slope * (float)(xd - intercept) || posSign == -1 && yd <= slope * (float)(xd - intercept))
+                window->buffer->content[pos] = col;
+            }
+            else // Horizontal line.
+            if (y1 == y2)
+            { if (posSign == 1 && yd >= y1 || posSign == -1 && yd <= y1)
+                window->buffer->content[pos] = col;
+            }
+            else // Vertical line.
+            if (posSign == 1 && xd >= x1 || posSign == -1 && xd <= x1)
+                window->buffer->content[pos] = col;
+          }
+        }
+
+      if (!window->isPixmap)
+      { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+        wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
+        wl_surface_damage_buffer(window->surface, x-radius, y-radius, x+radius, y+radius); // INT32_MAX, INT32_MAX);
+        wl_surface_commit(window->surface);
+        //wl_display_flush(waylandState.display);
+        //wl_display_dispatch_pending(waylandState.display);
+      }
+    }
+  }
+}
 
 // Could likely be optimized (specifically in the gap-filling, as the whole extra line isn't necessary).
 void drwPFArcPieSlice
@@ -1315,7 +1498,89 @@ void drwPFCircle
   }
 }
 
-// Unfinished.
+// Does not yet have an action associated with it.
+void drwPEllipse
+( const_winType actual_window,
+  intType x,
+  intType y,
+  intType width,
+  intType height,
+  intType col
+)
+{
+  logFunction(printf("drwPEllipse(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                     ", " FMT_D ", " FMT_D ", " F_X(08) ")\n",
+                     (memSizeType) actual_window, x, y,
+                     width, height, col););
+  if (unlikely(!inIntRange(x) || !inIntRange(y) ||
+                 width < 1 || width > UINT_MAX ||
+                 height < 1 || height > UINT_MAX))
+  { logError(printf("drwPEllipse(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                    ", " FMT_D ", " FMT_D ", " F_X(08) "): "
+                    "Raises RANGE_ERROR\n",
+                    (memSizeType) actual_window, x, y,
+                    width, height, col););
+    raise_error(RANGE_ERROR);
+  }
+  else
+  { way_winType window = (way_winType) actual_window;
+
+    if (prepare_buffer_copy(&waylandState, window))
+    { /* Utilizing the Freeman approach as laid out in the paper
+      There Is No Royal Road to Programs:
+        https://cs.dartmouth.edu/~doug/155.pdf */
+      intType xc = x, yc = y, a = width, b = height;
+      /* e(x,y) = bˆ2*xˆ2 + aˆ2*yˆ2 - aˆ2*bˆ2 */
+      x = 0, y = b;
+      long a2 = (long)a*a, b2 = (long)b*b;
+      long crit1 = -(a2/4 + a%2 + b2);
+      long crit2 = -(b2/4 + b%2 + a2);
+      long crit3 = -(b2/4 + b%2);
+      long t = -a2*y; /* t = e(x+1/2,y-1/2) - (aˆ2+bˆ2)/4 */
+      long dxt = 2*b2*x, dyt = -2*a2*y;
+      long d2xt = 2*b2, d2yt = 2*a2;
+      while(y>=0 && x<=a)
+      { // Render points.
+        drawRawPoint(window, xc+x, yc+y, col); // point(xc+x, yc+y);
+        if (x!=0 || y!=0)
+          drawRawPoint(window, xc-x, yc-y, col); // point(xc-x, yc-y);
+        if (x!=0 && y!=0)
+        { drawRawPoint(window, xc+x, yc-y, col); // point(xc+x, yc-y);
+          drawRawPoint(window, xc-x, yc+y, col); // point(xc-x, yc+y);
+        }
+        if (t + b2*x <= crit1 || /* e(x+1,y-1/2) <= 0 */
+            t + a2*y <= crit3) /* e(x+1/2,y) <= 0 */
+        { // incx();
+          x++;
+          dxt += d2xt;
+          t += dxt;
+        }
+        // Adjust variables.
+        else if (t - a2*y > crit2) /* e(x+1/2,y-1) > 0 */
+        { // incy();
+          y--;
+          dyt += d2yt;
+          t += dyt;
+        }
+        else
+        { // incx(); and incy();
+          x++; dxt += d2xt; t += dxt;
+          y--; dyt += d2yt; t += dyt;
+        }
+      }
+
+      if (!window->isPixmap)
+      { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+        wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
+        wl_surface_damage_buffer(window->surface, x-width, y-height, x+width, y+height);
+        wl_surface_commit(window->surface);
+        //wl_display_flush(waylandState.display);
+        //wl_display_dispatch_pending(waylandState.display);
+      }
+    }
+  }
+}
+
 void drwPFEllipse
 ( const_winType actual_window,
   intType x,
@@ -1325,7 +1590,79 @@ void drwPFEllipse
   intType col
 )
 {
-  puts("drwPFEllipse called.");
+  logFunction(printf("drwPFEllipse(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                     ", " FMT_D ", " FMT_D ", " F_X(08) ")\n",
+                     (memSizeType) actual_window, x, y,
+                     width, height, col););
+  if (unlikely(!inIntRange(x) || !inIntRange(y) ||
+                 width < 1 || width > UINT_MAX ||
+                 height < 1 || height > UINT_MAX))
+  { logError(printf("drwPFEllipse(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                    ", " FMT_D ", " FMT_D ", " F_X(08) "): "
+                    "Raises RANGE_ERROR\n",
+                    (memSizeType) actual_window, x, y,
+                    width, height, col););
+    raise_error(RANGE_ERROR);
+  }
+  else
+  { way_winType window = (way_winType) actual_window;
+
+    if (prepare_buffer_copy(&waylandState, window))
+    { // Utilizing the Freeman approach as laid out in: https://cs.dartmouth.edu/~doug/155.pdf
+      intType a = width/2, b = height/2, xc = x+a, yc = y+b;
+      /* e(x,y) = bˆ2*xˆ2 + aˆ2*yˆ2 - aˆ2*bˆ2 */
+      x = 0, y = b;
+      long a2 = (long)a*a, b2 = (long)b*b;
+      long crit1 = -(a2/4 + a%2 + b2);
+      long crit2 = -(b2/4 + b%2 + a2);
+      long crit3 = -(b2/4 + b%2);
+      long t = -a2*y; /* t = e(x+1/2,y-1/2) - (aˆ2+bˆ2)/4 */
+      long dxt = 2*b2*x, dyt = -2*a2*y;
+      long d2xt = 2*b2, d2yt = 2*a2;
+      while(y>=0 && x<=a)
+      { // Render lines (to fill the ellipse).
+        if (x!=0 && y!=0)
+        { drawRawLine(window, xc+x, yc+y, xc-x, yc+y, col);
+          drawRawLine(window, xc+x, yc-y, xc-x, yc-y, col);
+        }
+        else if (x!=0)
+          drawRawLine(window, xc+x, yc, xc-x, yc, col);
+        else
+        { drawRawPoint(window, xc, yc+y, col);
+          if (y!=0)
+            drawRawPoint(window, xc, yc-y, col);
+        }
+        // Adjust variables.
+        if (t + b2*x <= crit1 || /* e(x+1,y-1/2) <= 0 */
+            t + a2*y <= crit3) /* e(x+1/2,y) <= 0 */
+        { // incx();
+          x++;
+          dxt += d2xt;
+          t += dxt;
+        }
+        else if (t - a2*y > crit2) /* e(x+1/2,y-1) > 0 */
+        { // incy();
+          y--;
+          dyt += d2yt;
+          t += dyt;
+        }
+        else
+        { // incx(); and incy();
+          x++; dxt += d2xt; t += dxt;
+          y--; dyt += d2yt; t += dyt;
+        }
+      }
+
+      if (!window->isPixmap)
+      { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+        wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
+        wl_surface_damage_buffer(window->surface, x-width, y-height, x+width, y+height);
+        wl_surface_commit(window->surface);
+        //wl_display_flush(waylandState.display);
+        //wl_display_dispatch_pending(waylandState.display);
+      }
+    }
+  }
 }
 
 // Copied from drw_emc.c
@@ -1442,11 +1779,39 @@ void drwPolyLine (const_winType actual_window, intType x, intType y, bstriType p
   }
 }
 
-// Unfinished.
 void drwPPoint (const_winType actual_window, intType x, intType y, intType col)
-{}
+{
+  way_winType window;
+  int pos;
 
-// Unfinished.
+  logFunction(printf("drwPPoint(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                     ", " F_X(08) ")\n",
+                     (memSizeType) actual_window, x, y, col););
+  if (unlikely(!inIntRange(x) || !inIntRange(y)))
+  { logError(printf("drwPPoint(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                    ", " F_X(08) "): Raises RANGE_ERROR\n",
+                    (memSizeType) actual_window, x, y, col););
+    raise_error(RANGE_ERROR);
+  }
+  else
+  { window = (way_winType) actual_window;
+    pos = y*window->width + x;
+
+    if (pos < window->width * window->height && prepare_buffer_copy(&waylandState, window))
+    { window->buffer->content[pos] = col;
+
+      if (!window->isPixmap)
+      { wl_buffer_add_listener(window->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+        wl_surface_attach(window->surface, window->buffer->waylandData, 0, 0);
+        wl_surface_damage_buffer(window->surface, x, y, 1, 1); // INT32_MAX, INT32_MAX);
+        wl_surface_commit(window->surface);
+        // wl_display_flush(waylandState.display);
+        // wl_display_dispatch_pending(waylandState.display);
+      }
+    }
+  }
+}
+
 void drwPRect (const_winType actual_window, intType x, intType y, intType width, intType height, intType col)
 {
   logFunction(printf("drwPRect(" FMT_U_MEM ", " FMT_D ", " FMT_D
@@ -1465,7 +1830,6 @@ void drwPRect (const_winType actual_window, intType x, intType y, intType width,
   }
   else
   { way_winType window = (way_winType) actual_window;
-    //printf("DrwPRect colour: %ld, x: %ld, y: %ld, w: %ld, h: %ld\n", col, x, y, width, height);
 
     if (prepare_buffer_copy(&waylandState, window))
     { for (int yPos = y; yPos < y + height; yPos++)
@@ -1541,10 +1905,6 @@ void drwPutScaled
   const_winType pixmap
 )
 {}
-
-/* Unfinished.
-void drwRect (const_winType actual_window, intType x, intType y, intType width, intType height)
-{}*/
 
 /* Controls the internal processing of colours (looks like it's filling alpha with 0xff).
 Code Copied from drw_emc.c */
@@ -1712,7 +2072,6 @@ void resizeWindow (way_winType window, intType width, intType height, bool trigg
 void drwSetTransparentColor (winType pixmap, intType col)
 {}
 
-// Note: only deals with the primary window.
 void drwSetWindowName (winType aWindow, const const_striType windowName)
 {
   way_winType window = (way_winType) aWindow;
