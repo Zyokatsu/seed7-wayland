@@ -1,0 +1,210 @@
+
+(********************************************************************)
+(*                                                                  *)
+(*  https_request.s7i  Support to get and send data with HTTPS      *)
+(*  Copyright (C) 2013, 2014, 2023, 2026  Thomas Mertes             *)
+(*                                                                  *)
+(*  This file is part of the Seed7 Runtime Library.                 *)
+(*                                                                  *)
+(*  The Seed7 Runtime Library is free software; you can             *)
+(*  redistribute it and/or modify it under the terms of the GNU     *)
+(*  Lesser General Public License as published by the Free Software *)
+(*  Foundation; either version 2.1 of the License, or (at your      *)
+(*  option) any later version.                                      *)
+(*                                                                  *)
+(*  The Seed7 Runtime Library is distributed in the hope that it    *)
+(*  will be useful, but WITHOUT ANY WARRANTY; without even the      *)
+(*  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR *)
+(*  PURPOSE.  See the GNU Lesser General Public License for more    *)
+(*  details.                                                        *)
+(*                                                                  *)
+(*  You should have received a copy of the GNU Lesser General       *)
+(*  Public License along with this program; if not, write to the    *)
+(*  Free Software Foundation, Inc., 51 Franklin Street,             *)
+(*  Fifth Floor, Boston, MA  02110-1301, USA.                       *)
+(*                                                                  *)
+(********************************************************************)
+
+
+include "http_request.s7i";
+include "tls.s7i";
+
+
+const func file: openHttps (in httpLocation: locationData) is func
+  result
+    var file: sock is STD_NULL;
+  begin
+    # writeln("openHttps: " <& literal(locationData.serverName) <& " " <& locationData.portNumber);
+    # writeln(locationData.hostName <& ":" <& locationData.portNumber <& "/" <& locationData.path);
+    # writeln("params=" <& locationData.params);
+    if locationData.httpsProtocol then
+      sock := openTlsSocket(locationData.serverName, locationData.portNumber);
+    else
+      sock := openInetSocket(locationData.serverName, locationData.portNumber);
+    end if;
+  end func;
+
+
+const func file: openHttps (in httpRequest: request) is func
+  result
+    var file: sock is STD_NULL;
+  begin
+    sock := openHttps(request.location);
+    if sock <> STD_NULL then
+      sendHttp(sock, request);
+    end if;
+  end func;
+
+
+const func httpResponse: sendHttps (in var httpRequest: request, in boolean: proxy) is func
+  result
+    var httpResponse: response is httpResponse.value;
+  local
+    var file: sock is STD_NULL;
+    var boolean: okay is TRUE;
+    var integer: repeatCount is 0;
+  begin
+    request.location.httpsProtocol := TRUE;
+    if proxy and proxyServer <> "" then
+      request.location.serverName := proxyServer;
+      request.location.portNumber := proxyHttpPort;
+    end if;
+    repeat
+      okay := TRUE;
+      sock := openHttps(request);
+      if sock <> STD_NULL then
+        response.status := getHttpStatusCode(sock);
+        # writeln("statusCode: " <& response.status);
+        if response.status = HTTP_MOVED_PERMANENTLY or
+            response.status = HTTP_FOUND or
+            response.status = HTTP_SEE_OTHER or
+            response.status = HTTP_TEMPORARY_REDIRECT then
+          request.location := getHttpLocation(request.location, sock);
+          # show(locationData);
+          close(sock);
+          sock := STD_NULL;
+          okay := FALSE;
+          incr(repeatCount);
+        elsif response.status = HTTP_UNAUTHORIZED and
+              request.creds.username <> "" and
+              not request.creds.utilize then
+          # Upon receiving a 401 Unauthorized code, repeat the request
+          # with Basic Auth credentials if they were supplied, and
+          # if they were not all ready sent in the prior request.
+          request.creds.utilize := TRUE;
+          close(sock);
+          sock := STD_NULL;
+          okay := FALSE;
+        end if;
+      end if;
+    until okay or repeatCount > 5;
+    if sock <> STD_NULL then
+      response.body := getHttp(sock);
+      close(sock);
+    end if;
+  end func;
+
+
+const func httpResponse: sendHttps (in httpRequest: request) is
+  return sendHttps(request, FALSE);
+
+
+const func httpResponse: https (GET, in string: location, in httpCreds: creds) is func
+  result
+    var httpResponse: response is httpResponse.value;
+  local
+    var httpRequest: request is httpRequest.value;
+  begin
+    request.location := getHttpLocation(location, httpsDefaultPort);
+    request.creds := creds;
+    response := sendHttps(request, TRUE);
+  end func;
+
+
+(**
+ *  Get the response from the ''location'' using the HTTPS protocol.
+ *   https(GET, "example.com")
+ *   https(GET, "www.example.com/index.html")
+ *  @param location Url without https:// at the beginning.
+ *  @return the HTTP response from the ''location''.
+ *)
+const func httpResponse: https (GET, in string: location) is
+  return https(GET, location, httpCreds.value);
+
+
+const func httpResponse: https (DELETE, in string: location, in httpCreds: creds) is func
+  result
+    var httpResponse: response is httpResponse.value;
+  local
+    var httpRequest: request is httpRequest.value;
+  begin
+    request.method := "DELETE";
+    request.location := getHttpLocation(location, httpsDefaultPort);
+    request.creds := creds;
+    response := sendHttps(request, TRUE);
+  end func;
+
+
+const func httpResponse: https (DELETE, in string: location) is
+  return https(DELETE, location, httpCreds.value);
+
+
+const func httpResponse: https (POST, in string: location, in httpBody: body, in httpCreds: creds) is func
+  result
+    var httpResponse: response is httpResponse.value;
+  local
+    var httpRequest: request is httpRequest.value;
+  begin
+    request.location := getHttpLocation(location, httpsDefaultPort);
+    request.body := body;
+    request.creds := creds;
+    response := sendHttps(request, TRUE);
+  end func;
+
+
+const func httpResponse: https (POST, in string: location, in httpBody: body) is
+  return https(POST, location, body);
+
+
+const func httpResponse: https (POST, in string: location, in string: plain, in httpCreds: creds) is func
+  result
+    var httpResponse: response is httpResponse.value;
+  local
+    var httpRequest: request is httpRequest.value;
+  begin
+    request.location := getHttpLocation(location, httpsDefaultPort);
+    request.body.contentType := "text/plain";
+    request.body.content := plain;
+    request.creds := creds;
+    response := sendHttps(request, TRUE);
+  end func;
+
+
+const func httpResponse: https (POST, in string: location, in string: plain) is
+  return https(POST, location, plain);
+
+
+const func httpResponse: https (POST, in string: location, in hash [string] string: fields, in httpCreds: creds) is func
+  result
+    var httpResponse: response is httpResponse.value;
+  local
+    var httpRequest: request is httpRequest.value;
+    var string: name is "";
+    var string: value is "";
+  begin
+    request.method := "POST";
+    request.location := getHttpLocation(location, httpsDefaultPort);
+    request.body.contentType := "application/x-www-form-urlencoded";
+    for value key name range fields do
+      request.body.content &:= toHttpAscii(name) & "=" & toHttpAscii(value) & "&";
+    end for;
+    if endsWith(request.body.content, "&") then
+      request.body.content := request.body.content[.. length(request.body.content)-1];
+    end if;
+    request.creds := creds;
+    response := sendHttps(request, TRUE);
+  end func;
+
+
+const func httpResponse: https (POST, in string: location, in hash [string] string: fields) is
+  return https(POST, location, fields, httpCreds.value);
