@@ -29,11 +29,12 @@ void gkbInitKeyboard (void);
 --------------------------------------*/
 #define PI  3.141592653589793238462643383279502884197
 #define PI2 6.283185307179586476925286766559005768394
+// Uncomment the following directive to enable alpha support (in colours).
+// #define USE_ALPHA 1
 static winType globalEmptyWindow = 0;
 bool init_called = FALSE;
 struct ClientState waylandState = { 0 }; // Initial state (all nulls/zeros).
 //way_winType primaryWindow = 0;
-const bool AlphaEnabled = FALSE;
 
 /*------------------------------------------------------------------------------
                             Required Seed7 Functions
@@ -218,6 +219,67 @@ void drwFlush (void)
   wl_display_flush(waylandState.display); // Returns -1 if it wasn't able to send all data.
 }
 
+/*- Utilities --------------------------
+--------------------------------------*/
+/* Ensures the area from source to destination lies within the windows'
+bounds (or else width or height becomes zero). */
+void clamp_common_area
+( way_winType source,
+  way_winType destination,
+  intType *src_x,
+  intType *src_y,
+  intType *width,
+  intType *height,
+  intType *dest_x,
+  intType *dest_y
+)
+{
+  if
+  ( *width > 0 && *height > 0 &&
+    *src_x < source->width && *src_x + *width >= 0 && *src_y < source->height && *src_y + *height >= 0 &&
+    *dest_x < destination->width && *dest_y < destination->height
+  )
+  { /* If source-x is negative, we can skip those out-of-bound pixels,
+    so push the start-x's forward and reduce the reach accordingly. */
+    if (*src_x < 0)
+    { *width += *src_x;
+      *dest_x -= *src_x;
+      *src_x = 0;
+    }
+    // Do the same with the y.
+    if (*src_y < 0)
+    { *height += *src_y;
+      *dest_y -= *src_y;
+      *src_y = 0;
+    }
+    /* If destination-x is negative, the corresponding source pixels would be copied into nothing,
+    so push the start-x's forward and reduce the reach to match. */
+    if (*dest_x < 0)
+    { *src_x -= *dest_x;
+      *width += *dest_x;
+      *dest_x = 0;
+    }
+    // Do the same with the y.
+    if (*dest_y < 0)
+    { *src_y -= *dest_y;
+      *height += *dest_y;
+      *dest_y = 0;
+    }
+    /* If the reach (from the start) would proceed "off-the-edge" of the destination,
+    reduce the reach to the edge. */
+    if (*width + *dest_x > destination->width)
+      *width -= *width+*dest_x - destination->width;
+    if (*height + *dest_y > destination->height)
+      *height -= *height+*dest_y - destination->height;
+    /* Do the same with the source (in this case, treating "off-the-edge" as fully transparent,
+    and therefore pointless to copy over). */
+    if (*src_x + *width > source->width)
+      *width = source->width - *src_x;
+    if (*src_y + *height > source->height)
+      *height = source->height - *src_y;
+  }
+}
+
 /*- Raw Drawing Functions --------------
 These assume that a buffer has all ready
 been prepared; and they do not message
@@ -350,7 +412,7 @@ void drawRawLine (way_winType window, intType x1, intType y1, intType x2, intTyp
   }*/
 }
 
-// Could likey be optimized.
+// Could likey be optimized. Also, draws slightly different from x11's.
 // Assumes the window's buffer has all ready been prepared.
 void drawRawArc
 ( way_winType window,
@@ -395,7 +457,9 @@ void drawRawArc
   intType pos = 0, maxPos = window->buffer->width * window->buffer->height;
   intType xPos = 0, yPos = 0;
   float angle = 0.0;
-  // printf("Start angle: %f   End angle: %f\n", startAngle, endAngle);
+  // Account for rounding errors in the dynamic angles within the loop.
+  startAngle -= 0.000001;
+  endAngle += 0.000001;
 
   while (xd >= yd)
   { // Using the coordinate, render the eight mirrored points when appropriate.
@@ -523,14 +587,13 @@ winType drwCapture (intType left, intType upper, intType width, intType height)
   return (winType) pixmap;
 }
 
-// Unfinished.
 void drwClear (winType actual_window, intType col)
 {
   if (!init_called)
     drawInit();
 
   way_winType window = (way_winType) actual_window;
-  printf("Clear color: %ld\n", col);
+  // printf("Clear color: %ld\n", col);
 
   if (prepare_buffer_data(&waylandState, window))
   { // Could use memset instead?
@@ -575,7 +638,19 @@ rtlArrayType drwConvPointList (const const_bstriType pointList)
   return xyArray;
 } /* drwConvPointList */
 
-// Unfinished.
+/**
+ *  Copy a rectangular area from 'src_window' to 'dest_window'.
+ *  Coordinates are measured relative to the top left corner of the
+ *  corresponding window drawing area (inside of the window decorations).
+ *  @param src_window Source window.
+ *  @param dest_window Destination window.
+ *  @param src_x X-position of the top left corner of the source area.
+ *  @param src_y Y-position of the top left corner of the source area.
+ *  @param width Width of the rectangular area.
+ *  @param height Height of the rectangular area.
+ *  @param dest_x X-position of the top left corner of the destination area.
+ *  @param dest_y Y-position of the top left corner of the destination area.
+ */
 void drwCopyArea
 ( const_winType src_window,
   const_winType dest_window,
@@ -587,12 +662,59 @@ void drwCopyArea
   intType dest_y
 )
 {
-  puts("Draw copy area.");
+  way_winType source, destination;
+  intType dx, dy, sPos, dPos;
+
+  logFunction(printf("drwCopyArea(" FMT_U_MEM ", " FMT_U_MEM ", "
+                     FMT_D ", " FMT_D ", " FMT_D ", " FMT_D ", " FMT_D
+                     ", " FMT_D ")\n",
+                     (memSizeType) src_window, (memSizeType) dest_window,
+                     src_x, src_y, width, height, dest_x, dest_y););
+  if (unlikely(!inIntRange(src_x) || !inIntRange(src_y) ||
+               width < 1 || width > UINT_MAX ||
+               height < 1 || height > UINT_MAX ||
+               !inIntRange(dest_x) || !inIntRange(dest_y)))
+  { logError(printf("drwCopyArea(" FMT_U_MEM ", " FMT_U_MEM ", "
+                    FMT_D ", " FMT_D ", " FMT_D ", " FMT_D ", " FMT_D
+                    ", " FMT_D "): Raises RANGE_ERROR\n",
+                    (memSizeType) src_window, (memSizeType) dest_window,
+                    src_x, src_y, width, height, dest_x, dest_y););
+    raise_error(RANGE_ERROR);
+  }
+  else
+  { source = (way_winType) src_window;
+    destination = (way_winType) dest_window;
+    clamp_common_area(source, destination, &src_x, &src_y, &width, &height, &dest_x, &dest_y);
+    // If the resulting coordinates actually lie within both planes.
+    if (width > 0 && height > 0 && prepare_buffer_copy(&waylandState, destination))
+    { // Copy the pixels from source to destination.
+      for (dy = 0; dy < height; dy++)
+      { sPos = (src_y+dy)*source->width + src_x;
+        dPos = (dest_y+dy)*destination->width + dest_x;
+        for (dx = 0; dx < width; dx++)
+          destination->buffer->content[dPos+dx] = source->buffer->content[sPos+dx];
+      }
+      // When dealing with a wayland object, notify its surface of the change.
+      if (!destination->isPixmap)
+      { wl_buffer_add_listener(destination->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+        wl_surface_attach(destination->surface, destination->buffer->waylandData, 0, 0);
+        wl_surface_damage_buffer(destination->surface, dest_x, dest_y, width, height); // INT32_MAX, INT32_MAX);
+        wl_surface_commit(destination->surface);
+        // wl_display_flush(waylandState.display);
+        // wl_display_dispatch_pending(waylandState.display);
+      }
+    }
+  }
 }
 
-// Unfinished?
 winType drwEmpty (void)
 {
+  logFunction(printf("drwEmpty()\n"););
+  if (!init_called)
+      drawInit();
+  logFunction(printf("drwEmpty --> " FMT_U_MEM " (usage=" FMT_U ")\n",
+                    (memSizeType) emptyWindow,
+                     emptyWindow != NULL ? emptyWindow->usage_count : (uintType) 0););
   return globalEmptyWindow;
 }
 
@@ -768,26 +890,69 @@ intType drwGetPixel (const_winType sourceWindow, intType x, intType y)
   { int pos = y * window->buffer->width + x;
 
     if (pos < window->buffer->width * window->buffer->height)
+#ifdef USE_ALPHA
+      return window->buffer->content[pos];
+#else
     { intType result = window->buffer->content[pos];
 
       // FF 00 00 00 = 4278190080
       // Shift the first three bytes off (3*8 = 24) then negate the 4th byte (which is the alpha).
-      return AlphaEnabled ? result : result ^ result >> 24 << 24; // Necessary?
+      return result ^ result >> 24 << 24; // Necessary?
     }
+#endif
   }
 
   return 0;
 }
 
-// Unfinished.
+// Returns the colour of each pixel in the window.
 bstriType drwGetPixelData (const_winType sourceWindow)
 {
-  puts("Draw get pixel data called.");
-  bstriType result = NULL;
+  unsigned int pos;
+  unsigned int maxPos;
+  memSizeType result_size;
+  uint32Type *image_data, pixel;
+  bstriType result;
+  way_winType window = (way_winType) sourceWindow;
+
+  logFunction(printf("drwGetPixelData(" FMT_U_MEM ")\n", (memSizeType) sourceWindow););
+  maxPos = window->width * window->height;
+  result_size = maxPos * sizeof(uint32Type);
+  if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, result_size)))
+    raise_error(MEMORY_ERROR);
+  else
+  { result->size = result_size;
+    image_data = (uint32Type *) result->mem;
+    if (window->buffer && window->buffer->content)
+    { for (pos = 0; pos < maxPos; pos++)
+      {
+#ifdef USE_ALPHA
+        *image_data = window->buffer->content[pos];
+#else
+        pixel = window->buffer->content[pos];
+        *image_data = pixel ^ pixel >> 24 << 24; // Necessary?
+#endif
+        image_data++;
+      }
+    }
+    else
+      for (pos = 0; pos < maxPos; pos++)
+      { *image_data = 0xFF000000; // Black.
+        image_data++;
+      }
+  }
   return result;
 }
 
-// Unfinished.
+/**
+ *  Create a new pixmap with the given 'width' and 'height' from 'sourceWindow'.
+ *  A rectangle with the upper left corner at ('left', 'upper') and the given
+ *  'width' and 'height' is copied from 'sourceWindow' to the new pixmap.
+ *  The rectangle may extend to areas outside of 'sourceWindow'. The rectangle
+ *  areas outside of 'sourceWindow' are colored with black.
+ *  @return the created pixmap.
+ *  @exception RANGE_ERROR If 'height' or 'width' are negative or zero.
+ */
 winType drwGetPixmap
 ( const_winType sourceWindow,
   intType left,
@@ -796,7 +961,40 @@ winType drwGetPixmap
   intType height
 )
 {
-  way_winType pixmap = NULL;
+  way_winType pixmap, source;
+  intType x = 0, y = 0, dx, dy, dPos, sPos;
+
+  logFunction(printf("drwGetPixmap(" FMT_U_MEM ", " FMT_D ", " FMT_D
+                       ", " FMT_D ", " FMT_D ")\n",
+                       (memSizeType) sourceWindow, left, upper,
+                       width, height););
+  source = (way_winType) sourceWindow;
+  pixmap = (way_winType) drwNewPixmap(width, height);
+  if (pixmap && prepare_buffer_data(&waylandState, pixmap))
+  { if (source->buffer && source->buffer->content)
+    { clamp_common_area(source, pixmap, &left, &upper, &width, &height, &x, &y);
+      // printf("left: %ld  upper: %ld  width: %ld  height: %ld  x: %ld  y: %ld\n", left, upper, width, height, x, y);
+      for (dy = 0; dy < pixmap->height; dy++)
+      { dPos = dy*pixmap->width;
+        for (dx = 0; dx < pixmap->width; dx++)
+          if
+          ( left+dx >= 0 && left+dx < source->width &&
+            upper+dy >= 0 && upper+dy < source->height
+          )
+          { sPos = (upper+dy)*source->width + left;
+            pixmap->buffer->content[dPos+dx] = source->buffer->content[sPos+dx];
+          }
+          else
+            pixmap->buffer->content[dPos+dx] = 0xFF000000; // Black.
+      }
+    }
+    else
+      for (dy = 0; dy < pixmap->height; dy++)
+      { dPos = dy*pixmap->width;
+        for (dx = 0; dx < pixmap->width; dx++)
+          pixmap->buffer->content[dPos+dx] = 0xFF000000; // Black.
+      }
+  }
   return (winType) pixmap;
 }
 
@@ -812,14 +1010,23 @@ winType drwImage (int32Type *image_data, memSizeType width, memSizeType height, 
   return (winType) pixmap;
 }
 
-// Unfinished.
+/**
+ *  Create a new pixmap with the given 'width' and 'height'.
+ *  @return the created pixmap.
+ *  @exception RANGE_ERROR If 'height' or 'width' are negative or zero.
+ */
 winType drwNewPixmap (intType width, intType height)
 {
-  puts("drwNewPixmap called.");
   way_winType pixmap = NULL;
 
-  if (unlikely(!inIntRange(width) || !inIntRange(height) || width < 1 || height < 1))
+  logFunction(printf("drwNewPixmap(" FMT_D ", " FMT_D ")\n",
+                       width, height););
+  if (unlikely(width < 1 || width > UINT_MAX || height < 1 || height > UINT_MAX))
+  { logError(printf("drwNewPixmap(" FMT_D ", " FMT_D "): "
+                    "Raises RANGE_ERROR\n",
+                    width, height););
     raise_error(RANGE_ERROR);
+  }
   else
   { if (!init_called)
       drawInit();
@@ -834,9 +1041,12 @@ winType drwNewPixmap (intType width, intType height)
       pixmap->height = height;
       pixmap->buffer = NULL;
       // printf("  address: %p\n", pixmap);
+      // drwClear((winType) pixmap, 0xFF000000); // Clear window to black.
     }
   }
-
+  logFunction(printf("drwNewPixmap --> " FMT_U_MEM " (usage=" FMT_U ")\n",
+                     (memSizeType) pixmap,
+                     pixmap != NULL ? pixmap->usage_count : (uintType) 0););
   return (winType) pixmap;
 }
 
@@ -1006,7 +1216,7 @@ void drwPFArc
     { for (dr = 0; dr < width; dr++)
       { drawRawArc(window, x, y, radius-dr, startAngle, sweepAngle, col);
         // There's definitely a more efficient way to fill the gaps...
-        if (dr+1 < width)
+        if (dr < width)
         { drawRawArc(window, x-1, y, radius-dr, startAngle, sweepAngle, col);
           drawRawArc(window, x+1, y, radius-dr, startAngle, sweepAngle, col);
           drawRawArc(window, x, y-1, radius-dr, startAngle, sweepAngle, col);
@@ -1026,7 +1236,7 @@ void drwPFArc
   }
 }
 
-// Unfinished (should tie in with jesko's method to produce a shape similar to other arcs/circles).
+// Unfinished: should tie in with jesko's method to produce a shape similar to other arcs/circles.
 // Renders a circle, but skips the area outside the line formed by start and end angle.
 void drwPFArcChord
 ( const_winType actual_window,
@@ -2106,7 +2316,7 @@ void drwToTop (const_winType actual_window)
 
 intType drwWidth (const_winType actual_window)
 {
-  return ((way_winType) actual_window)->height;
+  return ((way_winType) actual_window)->width;
 }
 
 // Unfinished. (top-left x coordinate)
