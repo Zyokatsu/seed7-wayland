@@ -1,3 +1,32 @@
+/********************************************************************/
+/*                                                                  */
+/*  drw_way.c     Graphic access using Wayland capabilities.        */
+/*  Copyright (C) 2026  Thomas Mertes                               */
+/*                                                                  */
+/*  This file is part of the Seed7 Runtime Library.                 */
+/*                                                                  */
+/*  The Seed7 Runtime Library is free software; you can             */
+/*  redistribute it and/or modify it under the terms of the GNU     */
+/*  Lesser General Public License as published by the Free Software */
+/*  Foundation; either version 2.1 of the License, or (at your      */
+/*  option) any later version.                                      */
+/*                                                                  */
+/*  The Seed7 Runtime Library is distributed in the hope that it    */
+/*  will be useful, but WITHOUT ANY WARRANTY; without even the      */
+/*  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR */
+/*  PURPOSE.  See the GNU Lesser General Public License for more    */
+/*  details.                                                        */
+/*                                                                  */
+/*  You should have received a copy of the GNU Lesser General       */
+/*  Public License along with this program; if not, write to the    */
+/*  Free Software Foundation, Inc., 51 Franklin Street,             */
+/*  Fifth Floor, Boston, MA  02110-1301, USA.                       */
+/*                                                                  */
+/*  Module: Seed7 Runtime Library                                   */
+/*  File: seed7/src/wayland/drw_way.c                               */
+/*  Content: Graphic access using Wayland capabilities.             */
+/*                                                                  */
+/********************************************************************/
 #define LOG_FUNCTIONS 0
 #define VERBOSE_EXCEPTIONS 0
 #include "buffer.h"
@@ -76,19 +105,27 @@ void drawInit (void)
   init_called = TRUE;
 }
 
+/**
+ *  Determine the height of the screen in pixels.
+ */
 intType drwScreenHeight (void)
 {
+  logFunction(printf("drwScreenHeight()\n"););
   if (!init_called)
     drawInit();
-  puts("Screen height called.");
+  logFunction(printf("drwScreenHeight() --> %u\n", height););
   return (intType) waylandState.outputHeight;
 }
 
+/**
+ *  Determine the width of the screen in pixels.
+ */
 intType drwScreenWidth (void)
 {
+  logFunction(printf("drwScreenWidth()\n"););
   if (!init_called)
     drawInit();
-  puts("Screen width called.");
+  logFunction(printf("drwScreenWidth() --> %u\n", width););
   return (intType) waylandState.outputWidth;
 }
 
@@ -124,7 +161,7 @@ winType drwOpen (intType xPos, intType yPos, intType width, intType height, cons
       newWindow->height = height;
       newWindow->buffer = NULL;
       // primaryWindow = newWindow;
-      printf("  Window initialized: %p", newWindow);
+      // printf("  Window initialized: %p\n", newWindow);
 
       // Create a new surface (i.e. drawable area).
       newWindow->surface = wl_compositor_create_surface(waylandState.compositor);
@@ -1003,10 +1040,32 @@ intType drwHeight (const_winType actual_window)
   return ((way_winType) actual_window)->height;
 }
 
-// Unfinished.
 winType drwImage (int32Type *image_data, memSizeType width, memSizeType height, boolType hasAlphaChannel)
 {
   way_winType pixmap = NULL;
+  int32Type *pixel;
+  memSizeType pos, endPos;
+
+  logFunction(printf("drwImage(" FMT_U_MEM ", " FMT_U_MEM ", %d)\n",
+                     width, height, hasAlphaChannel););
+  pixmap = (way_winType) drwNewPixmap(width, height);
+  if (pixmap != NULL && prepare_buffer_data(&waylandState, pixmap))
+  { pixel = image_data;
+    pos = 0;
+    endPos = width*height;
+    for (pos = 0; pos < endPos; pos++)
+    { pixmap->buffer->content[pos] = *pixel;
+      pixel++;
+    }
+  }
+  else
+  if (pixmap)
+  { logError(printf("drwImage: failed to open a new buffer.\n"););
+    raise_error(GRAPHIC_ERROR);
+  }
+  logFunction(printf("drwImage --> " FMT_U_MEM " (usage=" FMT_U ")\n",
+                     (memSizeType) pixmap,
+                     pixmap != NULL ? pixmap->usage_count : (uintType) 0););
   return (winType) pixmap;
 }
 
@@ -1918,10 +1977,6 @@ void drwPLine (const_winType actual_window, intType x1, intType y1, intType x2, 
 }
 
 // Unfinished.
-void drwPoint (const_winType actual_window, intType x, intType y)
-{}
-
-// Unfinished.
 intType drwPointerXpos (const_winType actual_window)
 {
   return 0;
@@ -2074,22 +2129,19 @@ void drwPut (const_winType destWindow, intType xDest, intType yDest, const_winTy
   { way_winType destination = (way_winType) destWindow;
     way_winType source = (way_winType) pixmap;
 
-    if (prepare_buffer_copy(&waylandState, destination) && source->buffer && source->buffer->content)
+    if
+    ( xDest < destination->width && yDest < destination->height &&
+      source->buffer && source->buffer->content &&
+      prepare_buffer_copy(&waylandState, destination)
+    )
     { // Copy the data to the destination.
-      for (int y = 0, loop = 1; y < source->buffer->height && loop; y++)
-        for (int x = 0; x < source->buffer->width; x++)
+      for (int y = 0; y < source->buffer->height && y+yDest < destination->height; y++)
+        for (int x = 0; x < source->buffer->width && x+xDest < destination->width; x++)
         { int pos = y * source->buffer->width + x;
           int dx = xDest + x,
               dy = yDest + y,
               dpos = dy * destination->buffer->width + dx;
-
-
-          if (dx < destination->width && dy < destination->height)
-            destination->buffer->content[dpos] = source->buffer->content[pos];
-          else
-          { loop = 0;
-            break;
-          }
+          destination->buffer->content[dpos] = source->buffer->content[pos];
         }
 
       // If the destination is a Wayland window, send the data.
@@ -2098,8 +2150,7 @@ void drwPut (const_winType destWindow, intType xDest, intType yDest, const_winTy
         wl_surface_attach(destination->surface, destination->buffer->waylandData, 0, 0);
         wl_surface_damage_buffer(destination->surface, xDest, yDest, source->buffer->width, source->buffer->height); // Damage the affected area (as only that section needs updating).
         wl_surface_commit(destination->surface);
-
-        wl_display_dispatch(waylandState.display);
+        // wl_display_dispatch(waylandState.display);
       }
     }
   }
@@ -2139,9 +2190,12 @@ void drwSetCloseAction (winType actual_window, intType closeAction)
   } /* if */
 } /* drwSetCloseAction */
 
-// Unfinished.
 void drwSetContent (const_winType actual_window, const_winType pixmap)
-{}
+{
+  logFunction(printf("drwSetContent(" FMT_U_MEM ", " FMT_U_MEM ")\n",
+                     (memSizeType) actual_window, (memSizeType) pixmap););
+  drwPut(actual_window, 0, 0, pixmap);
+}
 
 // Note: only handles the main window.
 void drwSetCursorVisible (winType aWindow, boolType visible)
@@ -2236,6 +2290,7 @@ void redrawWindow (way_winType window)
   }
 }
 
+// Unfinished? X11 retains the buffer data when a window gets shrunk, so resizing back up restores the data.
 void resizeWindow (way_winType window, intType width, intType height, bool triggerKey)
 {
   uint32_t *oldContent = window->buffer ? window->buffer->content : 0;
