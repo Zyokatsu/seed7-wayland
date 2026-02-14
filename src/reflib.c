@@ -66,17 +66,6 @@
 
 
 
-objectType ref_addr (listType arguments)
-
-  { /* ref_addr */
-    logFunction(printf("ref_addr(");
-                trace1(arg_2(arguments));
-                printf(")\n"););
-    return bld_reference_temp(arg_2(arguments));
-  } /* ref_addr */
-
-
-
 objectType ref_alloc (listType arguments)
 
   { /* ref_alloc */
@@ -222,15 +211,6 @@ objectType ref_body (listType arguments)
 
 
 
-objectType ref_cast (listType arguments)
-
-  { /* ref_cast */
-    /* The reference value is taken as int on purpose */
-    return bld_int_temp(take_int(arg_3(arguments)));
-  } /* ref_cast */
-
-
-
 /**
  *  Get the category of a referenced object.
  *  @return the category of the referenced object.
@@ -306,21 +286,6 @@ objectType ref_cmp (listType arguments)
 
 
 
-objectType ref_content (listType arguments)
-
-  {
-    objectType obj_arg1;
-    listType result;
-
-  /* ref_content */
-    obj_arg1 = arg_1(arguments);
-    isit_reference(obj_arg1);
-    result = NULL;
-    return bld_reflist_temp(result);
-  } /* ref_content */
-
-
-
 /**
  *  Assign source/arg_3 to dest/arg_1.
  *  A copy function assumes that dest/arg_1 contains a legal value.
@@ -361,15 +326,6 @@ objectType ref_create (listType arguments)
     dest->value.objValue = take_reference(source);
     return SYS_EMPTY_OBJECT;
   } /* ref_create */
-
-
-
-objectType ref_deref (listType arguments)
-
-  { /* ref_deref */
-    isit_reference(arg_1(arguments));
-    return take_reference(arg_1(arguments));
-  } /* ref_deref */
 
 
 
@@ -589,30 +545,6 @@ objectType ref_local_vars (listType arguments)
 
 
 
-objectType ref_mkref (listType arguments)
-
-  {
-    objectType refe_to;
-    objectType refe_from;
-
-  /* ref_mkref */
-    refe_to = arg_1(arguments);
-    refe_from = arg_3(arguments);
-    isit_reference(refe_to);
-/*  is_variable(refe_to); */
-/*
-printf("ASSIGN ");
-trace2(arg_3(arguments));
-printf("\nTO ");
-trace2(refe_to);
-*/
-/* FIX !!!!! @@@@@ ##### $$$$$ %%%%% ^^^^^ &&&&& */
-    refe_to->value.objValue = refe_from;
-    return SYS_EMPTY_OBJECT;
-  } /* ref_mkref */
-
-
-
 /**
  *  Check if two references are not equal.
  *  @return FALSE if both references are equal,
@@ -709,14 +641,6 @@ objectType ref_path (listType arguments)
 
 
 
-objectType ref_prog (listType arguments)
-
-  { /* ref_prog */
-    return bld_reference_temp(NULL);
-  } /* ref_prog */
-
-
-
 /**
  *  Gets the initialization value of the result variable of funcRef/arg_1.
  *  @return a reference to the initialization value.
@@ -746,48 +670,6 @@ objectType ref_result (listType arguments)
     return bld_reference_temp(refResult(
         take_reference(arg_1(arguments))));
   } /* ref_result */
-
-
-
-objectType ref_scan (listType arguments)
-
-  {
-    striType str1;
-    objectType obj_variable;
-    cstriType name;
-    identType ident_found;
-    errInfoType err_info = OKAY_NO_ERROR;
-    objectType result;
-
-  /* ref_scan */
-    isit_stri(arg_1(arguments));
-    str1 = take_stri(arg_1(arguments));
-    obj_variable = arg_2(arguments);
-    isit_reference(obj_variable);
-    is_variable(obj_variable);
-    name = stri_to_cstri8(str1, &err_info);
-    if (name == NULL) {
-      raise_error(err_info);
-      result = NULL;
-    } else {
-      ident_found = get_ident(prog, (const_ustriType) name);
-      free_cstri8(name, str1);
-      if (ident_found == NULL ||
-          ident_found->entity == NULL ||
-          ident_found->entity->data.owner == NULL) {
-        result = raise_exception(SYS_MEM_EXCEPTION);
-      } else {
-        if (ident_found->entity->data.owner->obj != NULL) {
-          obj_variable->value.objValue = ident_found->entity->data.owner->obj;
-          result = SYS_TRUE_OBJECT;
-        } else {
-          obj_variable->value.objValue = ident_found->entity->syobject;
-          result = SYS_TRUE_OBJECT;
-        } /* if */
-      } /* if */
-    } /* if */
-    return result;
-  } /* ref_scan */
 
 
 

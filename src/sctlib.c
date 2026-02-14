@@ -314,22 +314,18 @@ objectType sct_create (listType arguments)
   /* sct_create */
     dest = arg_1(arguments);
     source = arg_3(arguments);
-    logFunction(printf("sct_create(");
-                trace1(dest);
-                printf(", ");
+    logFunction(printf("sct_create(*, ");
                 trace1(source);
                 printf(")\n"););
     SET_CATEGORY_OF_OBJ(dest, STRUCTOBJECT);
     SET_STRUCT_OWNER_FLAG(dest);
     isit_struct(source);
     if (TEMP_OBJECT(source)) {
-/*
-printf("create: pointer assignment\n");
-*/
+      /* Pointer assignment */
       dest->value.structValue = take_struct(source);
-      /* printf("sct_create: usage_count=%u %lu\n",
-          dest->value.structValue->usage_count,
-          (unsigned long) dest->value.structValue); */
+      logMessage(printf("sct_create: usage_count=%u " FMT_U_MEM "\n",
+                        dest->value.structValue->usage_count,
+                        (memSizeType) dest->value.structValue););
       source->value.structValue = NULL;
     } else {
       new_size = take_struct(source)->size;
@@ -530,43 +526,33 @@ objectType sct_select (listType arguments)
     objectType result;
 
   /* sct_select */
+    isit_struct(arg_1(arguments));
+    selector = arg_3(arguments);
     logFunction(printf("sct_select(");
                 trace1(arg_1(arguments));
+                printf(", ");
+                trace1(selector);
                 printf(")\n"););
-    isit_struct(arg_1(arguments));
     stru1 = take_struct(arg_1(arguments));
-    selector = arg_3(arguments);
-/*
-printf("stru1 ");
-trace1(arg_1(arguments));
-printf("\n");
-printf("selector ");
-trace1(selector);
-printf("\n");
-*/
     if (HAS_ENTITY(selector) &&
         GET_ENTITY(selector)->syobject != NULL) {
       selector_syobject = GET_ENTITY(selector)->syobject;
       position = stru1->size;
-      struct_pointer = &stru1->stru[position - 1];
       while (position > 0) {
-/*
-printf("test " FMT_U_MEM ": ", position);
-trace1(struct_pointer);
-printf("\n");
-*/
+        struct_pointer = &stru1->stru[position - 1];
+        logMessage(printf("sct_select: " FMT_U_MEM ": ", position);
+                   trace1(struct_pointer);
+                   printf("\n"););
         if (HAS_ENTITY(struct_pointer) &&
             GET_ENTITY(struct_pointer)->syobject == selector_syobject) {
-          if (TEMP_OBJECT(arg_1(arguments))) {
-/*
-            printf("sct_select of TEMP_OBJECT\n");
-            printf("stru1 ");
-            trace1(arg_1(arguments));
-            printf("\n");
-            printf("selector ");
-            trace1(selector);
-            printf("\n");
-*/
+          if (TEMP_OBJECT(arg_1(arguments)) ||
+              TEMP_DYNAMIC_OBJECT(arg_1(arguments))) {
+            logMessage(printf("sct_select of TEMP_OBJECT\n");
+                       printf("struct: ");
+                       trace1(arg_1(arguments));
+                       printf("\nselector: ");
+                       trace1(selector);
+                       printf("\n"););
             /* The struct will be destroyed after selecting. */
             /* A copy is necessary here to avoid a crash !!!!! */
             if (unlikely(!ALLOC_OBJECT(result))) {
@@ -582,13 +568,18 @@ printf("\n");
               FREE_STRUCT(stru1, stru1->size);
               arg_1(arguments)->value.structValue = NULL;
             } /* if */
+            logFunction(printf("sct_select --> ");
+                        trace1(result);
+                        printf("\n"););
             return result;
           } else {
+            logFunction(printf("sct_select --> ");
+                        trace1(struct_pointer);
+                        printf("\n"););
             return struct_pointer;
           } /* if */
         } /* if */
         position--;
-        struct_pointer--;
       } /* while */
     } /* if */
     logError(printf("sct_select(");

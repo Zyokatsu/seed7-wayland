@@ -46,40 +46,48 @@ const func string: toBase64 (in string: byteStri) is func
     var string: base64 is "";
   local
     const string: coding is "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const integer: newlineDelta is 57;
+    var integer: base64Length is 0;
     var integer: index is 1;
-    var integer: subIndex is 1;
-    var char: ch is ' ';
+    var integer: destIndex is 1;
+    var integer: remainingChars is 0;
     var integer: threeBytes is 0;
-    var string: fourBytes is "    ";
-    var integer: posToAddNewline is 58;
+    var integer: posToAddNewline is succ(newlineDelta);
   begin
-    for index range 1 to length(byteStri) step 3 do
-      threeBytes := 0;
-      for subIndex range index to index + 2 do
-        threeBytes <<:= 8;
-        if subIndex <= length(byteStri) then
-          ch := byteStri[subIndex];
-          if ch >= '\256;' then
-            raise RANGE_ERROR;
-          end if;
-          threeBytes +:= ord(ch);
-        end if;
-      end for;
-      fourBytes @:= [1] coding[succ( threeBytes >> 18)];
-      fourBytes @:= [2] coding[succ((threeBytes >> 12) mod 64)];
-      fourBytes @:= [3] coding[succ((threeBytes >>  6) mod 64)];
-      fourBytes @:= [4] coding[succ( threeBytes        mod 64)];
+    base64Length := (length(byteStri) + 2) div 3 * 4;
+    base64Length +:= pred(length(byteStri)) div newlineDelta;  # Add space for newlines
+    base64 := "\0;" mult base64Length;
+    for index range 1 to length(byteStri) - 2 step 3 do
       if index = posToAddNewline then
-        base64 &:= "\n";
-        posToAddNewline +:= 57;
+        base64 @:= [destIndex] '\n';
+        posToAddNewline +:= newlineDelta;
+        incr(destIndex);
       end if;
-      base64 &:= fourBytes;
+      threeBytes := bytes2Int(byteStri[index fixLen 3], UNSIGNED, BE);
+      base64 @:= [destIndex]       coding[succ( threeBytes >> 18)];
+      base64 @:= [succ(destIndex)] coding[succ((threeBytes >> 12) mod 64)];
+      base64 @:= [destIndex + 2]   coding[succ((threeBytes >>  6) mod 64)];
+      base64 @:= [destIndex + 3]   coding[succ( threeBytes        mod 64)];
+      destIndex +:= 4;
     end for;
-    index := length(base64);
-    if length(byteStri) rem 3 = 2 then
-      base64 @:= [index] '=';
-    elsif length(byteStri) rem 3 = 1 then
-      base64 @:= [pred(index)] "==";
+    remainingChars := length(byteStri) rem 3;
+    if remainingChars <> 0 then
+      index := succ(length(byteStri) - remainingChars);
+      if index = posToAddNewline then
+        base64 @:= [destIndex] '\n';
+        incr(destIndex);
+      end if;
+      threeBytes := bytes2Int(byteStri[index ..], UNSIGNED, BE) *
+                    256 ** (3  - remainingChars);
+      base64 @:= [destIndex]       coding[succ( threeBytes >> 18)];
+      base64 @:= [succ(destIndex)] coding[succ((threeBytes >> 12) mod 64)];
+      base64 @:= [destIndex + 2]   coding[succ((threeBytes >>  6) mod 64)];
+      index := length(base64);
+      if remainingChars = 2 then
+        base64 @:= [index] '=';
+      elsif remainingChars = 1 then
+        base64 @:= [pred(index)] "==";
+      end if;
     end if;
   end func;
 
@@ -106,10 +114,11 @@ const func string: fromBase64 (in string: base64) is func
         39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51); # n - z
     var integer: index is 1;
     var integer: subIndex is 1;
+    var integer: destIndex is 1;
     var integer: number is 0;
     var integer: fourBytes is 0;
-    var string: threeBytes is "   ";
   begin
+    decoded := "\0;" mult (length(base64) + 3) div 4 * 3;
     while index <= length(base64) - 3 do
       if base64[index] >= '+' then
         fourBytes := 0;
@@ -120,10 +129,8 @@ const func string: fromBase64 (in string: base64) is func
           end if;
           fourBytes := (fourBytes << 6) + number;
         end for;
-        threeBytes @:= [1] char( fourBytes >> 16);
-        threeBytes @:= [2] char((fourBytes >>  8) mod 256);
-        threeBytes @:= [3] char( fourBytes        mod 256);
-        decoded &:= threeBytes;
+        decoded @:= [destIndex] bytes(fourBytes, UNSIGNED, BE, 3);
+        destIndex +:= 3;
         index +:= 4;
       elsif base64[index] = '\n' or base64[index] = '\r' then
         incr(index);
@@ -137,9 +144,135 @@ const func string: fromBase64 (in string: base64) is func
       raise RANGE_ERROR;
     end if;
     if length(base64) >= 2 and base64[pred(length(base64)) fixLen 2] = "==" then
-      decoded := decoded[.. length(decoded) - 2];
+      decoded := decoded[.. destIndex - 3];
     elsif length(base64) >= 1 and base64[length(base64)] = '=' then
-      decoded := decoded[.. pred(length(decoded))];
+      decoded := decoded[.. destIndex - 2];
+    else
+      decoded := decoded[.. pred(destIndex)];
+    end if;
+  end func;
+
+
+(**
+ *  Encode a string with the Base64 URL-variant encoding.
+ *  Base64 encodes a byte string as ASCII string. This is done by
+ *  taking packs of 6-bits and translating them into a radix-64
+ *  representation. The radix-64 digits are encoded with letters
+ *  (upper case followed by lower case), digits and the characters
+ *  '-' and '_'.
+ *  @param byteStri The string to encode.
+ *  @param pad Wether or not to pad the result with '='.
+ *  @return the Base64Url encoded string.
+ *  @exception RANGE_ERROR If characters beyond '\255;' are present.
+ *)
+const func string: toBase64Url (in string: byteStri, in boolean: pad) is func
+  result
+    var string: base64 is "";
+  local
+    const string: coding is "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    var integer: index is 1;
+    var integer: destIndex is 1;
+    var integer: remainingChars is 0;
+    var integer: threeBytes is 0;
+  begin
+    base64 := "\0;" mult (length(byteStri) + 2) div 3 * 4;
+    for index range 1 to length(byteStri) - 2 step 3 do
+      threeBytes := bytes2Int(byteStri[index fixLen 3], UNSIGNED, BE);
+      base64 @:= [destIndex]       coding[succ( threeBytes >> 18)];
+      base64 @:= [succ(destIndex)] coding[succ((threeBytes >> 12) mod 64)];
+      base64 @:= [destIndex + 2]   coding[succ((threeBytes >>  6) mod 64)];
+      base64 @:= [destIndex + 3]   coding[succ( threeBytes        mod 64)];
+      destIndex +:= 4;
+    end for;
+    remainingChars := length(byteStri) rem 3;
+    if remainingChars <> 0 then
+      index := succ(length(byteStri) - remainingChars);
+      threeBytes := bytes2Int(byteStri[index ..], UNSIGNED, BE) *
+                    256 ** (3  - remainingChars);
+      base64 @:= [destIndex]       coding[succ( threeBytes >> 18)];
+      base64 @:= [succ(destIndex)] coding[succ((threeBytes >> 12) mod 64)];
+      base64 @:= [destIndex + 2]   coding[succ((threeBytes >>  6) mod 64)];
+      index := length(base64);
+      if remainingChars = 2 then
+        if pad then
+          base64 @:= [index] '=';
+        else
+          base64 := base64[.. pred(index)];
+        end if;
+      elsif remainingChars = 1 then
+        if pad then
+          base64 @:= [pred(index)] "==";
+        else
+          base64 := base64[.. index - 2];
+        end if;
+      end if;
+    end if;
+  end func;
+
+
+(**
+ *  Decode a Base64Url encoded string.
+ *  @param base64 Base64Url encoded string without leading or trailing
+ *         whitespace characters. Accepts padded and unpadded values.
+ *  @return the decoded string.
+ *  @exception RANGE_ERROR If ''base64'' is not in Base64Url format.
+ *)
+const func string: fromBase64Url (in var string: base64) is func
+  result
+    var string: decoded is "";
+  local
+    const array integer: decode is [] (                      # -1 is illegal
+        62, -1, -1,                                          # - (dash)
+        52, 53, 54, 55, 56, 57, 58, 59, 60, 61,              # 0 - 9
+        -1, -1, -1,  0, -1, -1, -1,                          # =
+         0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12,  # A - M
+        13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,  # N - Z
+        -1, -1, -1, -1, 63, -1,                              # _ (underscore)
+        26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,  # a - m
+        39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51); # n - z
+    var integer: index is 1;
+    var integer: subIndex is 1;
+    var integer: destIndex is 1;
+    var integer: number is 0;
+    var integer: fourBytes is 0;
+  begin
+    # Supply padding when absent.
+    case length(base64) rem 4 of
+      when {3}: base64 &:= '=';
+      when {2}: base64 &:= "==";
+      when {1}: raise RANGE_ERROR;
+    end case;
+    decoded := "\0;" mult (length(base64) + 3) div 4 * 3;
+    while index <= length(base64) - 3 do
+      if base64[index] >= '-' then
+        fourBytes := 0;
+        for subIndex range index to index + 3 do
+          number := decode[ord(base64[subIndex]) - ord(pred('-'))];
+          if number = -1 then
+            raise RANGE_ERROR;
+          end if;
+          fourBytes := (fourBytes << 6) + number;
+        end for;
+        decoded @:= [destIndex] bytes(fourBytes, UNSIGNED, BE, 3);
+        destIndex +:= 3;
+        index +:= 4;
+      elsif base64[index] = '\n' or base64[index] = '\r' then
+        incr(index);
+      else
+        raise RANGE_ERROR;
+      end if;
+    end while;
+    if index <> succ(length(base64)) or
+        (length(base64) >= 2 and
+         pos(base64[.. length(base64) - 2], '=') <> 0) then
+      raise RANGE_ERROR;
+    end if;
+    if length(base64) >= 2 and base64[pred(length(base64)) fixLen 2] = "==" then
+      decoded := decoded[.. destIndex - 3];
+    elsif length(base64) >= 1 and base64[length(base64)] = '=' then
+      decoded := decoded[.. destIndex - 2];
+    else
+      decoded := decoded[.. pred(destIndex)];
     end if;
   end func;
 
@@ -257,48 +390,49 @@ const func string: toUuencoded (in string: byteStri) is func
   result
     var string: uuencoded is "";
   local
+    const integer: newlineDelta is 45;
+    var integer: destLength is 0;
     var integer: index is 1;
-    var integer: subIndex is 1;
-    var char: ch is ' ';
+    var integer: destIndex is 1;
+    var integer: remainingChars is 0;
     var integer: threeBytes is 0;
-    var string: fourBytes is "    ";
-    var integer: posToAddNewline is 43;
+    var integer: posToAddNewline is newlineDelta - 2;
   begin
     if length(byteStri) <> 0 then
-      if length(byteStri) < 45 then
-        uuencoded &:= char(32 + length(byteStri));
-      else
-        uuencoded &:= "M";
-      end if;
-      for index range 1 to length(byteStri) step 3 do
-        threeBytes := 0;
-        for subIndex range index to index + 2 do
-          threeBytes <<:= 8;
-          if subIndex <= length(byteStri) then
-            ch := byteStri[subIndex];
-            if ch >= '\256;' then
-              raise RANGE_ERROR;
-            end if;
-            threeBytes +:= ord(ch);
-          end if;
-        end for;
-        fourBytes @:= [1] char(32 + (threeBytes >> 18));
-        fourBytes @:= [2] char(32 + (threeBytes >> 12) mod 64);
-        fourBytes @:= [3] char(32 + (threeBytes >>  6) mod 64);
-        fourBytes @:= [4] char(32 +  threeBytes        mod 64);
-        uuencoded &:= fourBytes;
-        if index = posToAddNewline and length(byteStri) > index + 2 then
-          if length(byteStri) - index - 2 < 45 then
-            uuencoded &:= "\n" <& char(32 + length(byteStri) - index - 2);
-          else
-            uuencoded &:= "\nM";
-          end if;
-          posToAddNewline +:= 45;
+      destLength := (length(byteStri) + 2) div 3 * 4 + 4;
+      destLength +:= pred(length(byteStri)) div newlineDelta * 2;  # Add space for newlines
+      uuencoded := "\0;" mult destLength;
+      uuencoded @:= [destIndex] char(32 + min(length(byteStri), newlineDelta));
+      incr(destIndex);
+      for index range 1 to length(byteStri) - 2 step 3 do
+        threeBytes := bytes2Int(byteStri[index fixLen 3], UNSIGNED, BE);
+        uuencoded @:= [destIndex]       char(32 + (threeBytes >> 18));
+        uuencoded @:= [succ(destIndex)] char(32 + (threeBytes >> 12) mod 64);
+        uuencoded @:= [destIndex + 2]   char(32 + (threeBytes >>  6) mod 64);
+        uuencoded @:= [destIndex + 3]   char(32 +  threeBytes        mod 64);
+        destIndex +:= 4;
+        if index = posToAddNewline and index < length(byteStri) - 2 then
+          uuencoded @:= [destIndex] "\n" <&
+                        char(32 + min(length(byteStri) - index - 2, newlineDelta));
+          posToAddNewline +:= newlineDelta;
+          destIndex +:= 2;
         end if;
       end for;
-      uuencoded &:= "\n";
+      remainingChars := length(byteStri) rem 3;
+      if remainingChars <> 0 then
+        index := succ(length(byteStri) - remainingChars);
+        threeBytes := bytes2Int(byteStri[index ..], UNSIGNED, BE) *
+                      256 ** (3  - remainingChars);
+        uuencoded @:= [destIndex]       char(32 + (threeBytes >> 18));
+        uuencoded @:= [succ(destIndex)] char(32 + (threeBytes >> 12) mod 64);
+        uuencoded @:= [destIndex + 2]   char(32 + (threeBytes >>  6) mod 64);
+        uuencoded @:= [destIndex + 3]   char(32 +  threeBytes        mod 64);
+        destIndex +:= 4;
+      end if;
+      uuencoded @:= [destIndex] "\n`\n";
+    else
+      uuencoded := "`\n";
     end if;
-    uuencoded &:= "`\n";
   end func;
 
 
@@ -315,10 +449,11 @@ const func string: fromUuencoded (in string: uuencoded) is func
     var integer: lineLength is 1;
     var integer: index is 1;
     var integer: subIndex is 1;
+    var integer: destIndex is 1;
     var integer: number is 0;
     var integer: fourBytes is 0;
-    var string: threeBytes is "   ";
   begin
+    decoded := "\0;" mult (length(uuencoded) + 3) div 4 * 3;
     lineLength := ord(uuencoded[1]) - 32;
     while lineLength <> 0 and lineLength <> 64 do
       incr(index);
@@ -333,10 +468,8 @@ const func string: fromUuencoded (in string: uuencoded) is func
           end if;
           fourBytes := (fourBytes << 6) + number;
         end for;
-        threeBytes @:= [1] char( fourBytes >> 16);
-        threeBytes @:= [2] char((fourBytes >>  8) mod 256);
-        threeBytes @:= [3] char( fourBytes        mod 256);
-        decoded &:= threeBytes[ .. lineLength];
+        decoded @:= [destIndex] bytes(fourBytes, UNSIGNED, BE, 3);
+        destIndex +:= min(lineLength, 3);
         lineLength -:= 3;
         index +:= 4;
       end while;
@@ -350,6 +483,7 @@ const func string: fromUuencoded (in string: uuencoded) is func
         lineLength := 0;
       end if;
     end while;
+    decoded := decoded[.. pred(destIndex)];
   end func;
 
 
@@ -507,22 +641,23 @@ const func string: toAscii85 (in string: byteStri) is func
     var string: ascii85 is "";
   local
     var integer: index is 0;
+    var integer: destIndex is 1;
     var integer: subIndex is 0;
     var integer: fourBytes is 0;
-    var string: fiveBytes is "     ";
     var integer: partialGroupSize is 0;
-    var char: ch is ' ';
   begin
+    ascii85 := "\0;" mult (length(byteStri) + 3) div 4 * 5;
     for index range 1 to length(byteStri) - 3 step 4 do
       fourBytes := bytes2Int(byteStri[index fixLen 4], UNSIGNED, BE);
       if fourBytes = 0 then
-        ascii85 &:= 'z';
+        ascii85 @:= [destIndex] 'z';
+        incr(destIndex);
       else
-        for subIndex range 5 downto 1 do
-          fiveBytes @:= [subIndex] char(ord('!') + fourBytes rem 85);
+        for subIndex range destIndex + 4 downto destIndex do
+          ascii85 @:= [subIndex] char(ord('!') + fourBytes rem 85);
           fourBytes := fourBytes div 85;
         end for;
-        ascii85 &:= fiveBytes;
+        destIndex +:= 5;
       end if;
     end for;
     partialGroupSize := length(byteStri) mod 4;
@@ -531,11 +666,13 @@ const func string: toAscii85 (in string: byteStri) is func
       fourBytes := bytes2Int(byteStri[index ..] &
                              "\0;" mult 4 - partialGroupSize,
                              UNSIGNED, BE);
-      for subIndex range 5 downto 1 do
-        fiveBytes @:= [subIndex] char(ord('!') + fourBytes rem 85);
-        fourBytes := fourBytes div 85;
-      end for;
-      ascii85 &:= fiveBytes[.. succ(partialGroupSize)];
+      ascii85 @:= [destIndex]       char(ord('!') + fourBytes div 52200625);
+      ascii85 @:= [succ(destIndex)] char(ord('!') + fourBytes div   614125 rem 85);
+      ascii85 @:= [destIndex + 2]   char(ord('!') + fourBytes div     7225 rem 85);
+      ascii85 @:= [destIndex + 3]   char(ord('!') + fourBytes div       85 rem 85);
+      ascii85 := ascii85[.. destIndex + partialGroupSize];
+    else
+      ascii85 := ascii85[.. pred(destIndex)];
     end if;
   end func;
 

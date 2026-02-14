@@ -1921,7 +1921,14 @@ static void writeMacroDefs (FILE *versionFile)
                           "{*ptrA += *ptrC; *ptrB += *ptrC; return *ptrA + *ptrB;}\n"
                           "int main(int argc,char *argv[])\n"
                           "{int a=1, b=2, c=3; return test(&a, &b, &c);}\n")) {
-      fputs("#define restrict\n", versionFile);
+      if (compileAndLinkOk("int test (int *__restrict__ ptrA, int *__restrict__ ptrB, int *__restrict__ ptrC)\n"
+                           "{*ptrA += *ptrC; *ptrB += *ptrC; return *ptrA + *ptrB;}\n"
+                           "int main(int argc,char *argv[])\n"
+                           "{int a=1, b=2, c=3; return test(&a, &b, &c);}\n")) {
+        fputs("#define restrict __restrict__\n", versionFile);
+      } else {
+        fputs("#define restrict\n", versionFile);
+      } /* if */
     } /* if */
     if (compileAndLinkOk("#include <stdio.h>\nint main(int argc,char *argv[])\n"
                          "{if(__builtin_expect(1,1))puts(\"1\");else puts(\"0\");\n"
@@ -2192,6 +2199,7 @@ static void numericSizes (FILE *versionFile)
     int sizeof_short;
     int sizeof_int64;
     int sizeof_gid_t;
+    int sizeof_pid_t;
     int sizeof_uid_t;
 
   /* numericSizes */
@@ -2215,6 +2223,7 @@ static void numericSizes (FILE *versionFile)
     sizeof_float     = getSizeof("float");
     sizeof_double    = getSizeof("double");
     sizeof_gid_t     = getSizeof("gid_t");
+    sizeof_pid_t     = getSizeof("pid_t");
     sizeof_uid_t     = getSizeof("uid_t");
 
     fprintf(versionFile, "#define CHAR_SIZE %d\n",        char_bit * sizeof_char);
@@ -2236,6 +2245,10 @@ static void numericSizes (FILE *versionFile)
     if (sizeof_gid_t > 0) {
       fprintf(versionFile, "#define GID_T_SIZE %d\n",     char_bit * sizeof_gid_t);
       fprintf(versionFile, "#define GID_T_SIGNED %d\n", isSignedType("gid_t"));
+    } /* if */
+    if (sizeof_pid_t > 0) {
+      fprintf(versionFile, "#define PID_T_SIZE %d\n",     char_bit * sizeof_pid_t);
+      fprintf(versionFile, "#define PID_T_SIGNED %d\n", isSignedType("pid_t"));
     } /* if */
     if (sizeof_uid_t > 0) {
       fprintf(versionFile, "#define UID_T_SIZE %d\n",     char_bit * sizeof_uid_t);
@@ -4656,12 +4669,12 @@ static void checkRemoveDir (const char *makeDirDef, FILE *versionFile)
 
 
 
-static void determineGetaddrlimit (FILE *versionFile)
+static void determineGetrlimit (FILE *versionFile)
 
   {
     int has_getrlimit;
 
-  /* determineGetaddrlimit */
+  /* determineGetrlimit */
     /* In FreeBSD it is necessary to include <sys/types.h> before <sys/resource.h> */
     has_getrlimit = compileAndLinkOk("#include <stdio.h>\n"
                                      "#include <sys/types.h>\n#include <sys/resource.h>\n"
@@ -4704,7 +4717,102 @@ static void determineGetaddrlimit (FILE *versionFile)
         fprintf(versionFile, "#define HARD_STACK_LIMIT %lu\n", (unsigned long) doTest() * 1024);
       } /* if */
     } /* if */
-  } /* determineGetaddrlimit */
+  } /* determineGetrlimit */
+
+
+
+static void determineSigaltstack (FILE *versionFile)
+
+  {
+    int has_sigaltstack;
+    int sigaltstack_enabled;
+
+  /* determineSigaltstack */
+    has_sigaltstack = compileAndLinkOk("#include <stdio.h>\n#include <signal.h>\n"
+                                       "int main(int argc, char *argv[]){\n"
+                                       "stack_t ss;\n"
+                                       "printf(\"%d\\n\", sigaltstack(NULL, &ss) == 0);\n"
+                                       "return 0;}\n") && doTest() == 1;
+    fprintf(versionFile, "#define HAS_SIGALTSTACK %d\n", has_sigaltstack);
+    if (has_sigaltstack) {
+      if (assertCompAndLnk("#include <stdio.h>\n#include <signal.h>\n"
+                           "int main(int argc, char *argv[]){\n"
+                           "stack_t ss;\n"
+                           "if (sigaltstack(NULL, &ss) == 0) {\n"
+                           "  printf(\"%d\\n\", ss.ss_flags & SS_DISABLE != 0);\n"
+                           "} else {\n"
+                           "  printf(\"-1\\n\");\n"
+                           "}\n"
+                           "return 0;}\n")) {
+        sigaltstack_enabled = doTest();
+        fprintf(versionFile, "#define SIGNAL_STACK_ENABLED %d\n", sigaltstack_enabled);
+        if (sigaltstack_enabled) {
+          if (assertCompAndLnk("#include <stdio.h>\n#include <signal.h>\n"
+                               "int main(int argc, char *argv[]){\n"
+                               "stack_t ss;\n"
+                               "if (sigaltstack(NULL, &ss) == 0) {\n"
+                               "  printf(\"%d\\n\", (int) ss.ss_size);\n"
+                               "} else {\n"
+                               "  printf(\"-1\\n\");\n"
+                               "}\n"
+                               "return 0;}\n")) {
+            fprintf(versionFile, "#define SIGNAL_STACK_SIZE %d\n", doTest());
+          } /* if */
+        } else {
+          if (assertCompAndLnk("#include <stdio.h>\n#include <signal.h>\n"
+                               "#include <stdlib.h>\n"
+                               "int main(int argc, char *argv[]){\n"
+                               "stack_t ss, ss_old;\n"
+                               "ss.ss_sp = malloc(SIGSTKSZ);\n"
+                               "if (ss.ss_sp == NULL) {\n"
+                               "  printf(\"-1\\n\");\n"
+                               "} else {\n"
+                               "  ss.ss_size = SIGSTKSZ;\n"
+                               "  ss.ss_flags = 0;\n"
+                               "  if (sigaltstack(&ss, NULL) == -1) {\n"
+                               "    printf(\"-1\\n\");\n"
+                               "  } else {\n"
+                               "    if (sigaltstack(NULL, &ss_old) == 0) {\n"
+                               "      printf(\"%d\\n\", (int) ss_old.ss_size);\n"
+                               "    } else {\n"
+                               "      printf(\"-1\\n\");\n"
+                               "    }\n"
+                               "  }\n"
+                               "}\n"
+                               "return 0;}\n")) {
+            fprintf(versionFile, "#define SIGNAL_STACK_SIZE %d\n", doTest());
+          } /* if */
+        } /* if */
+      } /* if */
+    } else {
+      fputs("#define SIGNAL_STACK_ENABLED 0\n", versionFile);
+    } /* if */
+  } /* determineSigaltstack */
+
+
+
+static void determineAddVectoredExceptionHandler (FILE *versionFile)
+
+  { /* determineAddVectoredExceptionHandler */
+    fprintf(versionFile, "#define HAS_VECTORED_EXCEPTION_HANDLER %d\n",
+            compileAndLinkOk("#define _WIN32_WINNT 0x500\n"
+                             "#include <windows.h>\n#include <stdio.h>\n"
+                             "#include <setjmp.h>\n"
+                             "jmp_buf jump_buffer;\n"
+                             "LONG WINAPI stackOverflowHandler (PEXCEPTION_POINTERS pExp) {\n"
+                             "  longjmp(jump_buffer, 1); return 0; }\n"
+                             "void stackOverflow (unsigned int param) {\n"
+                             "  stackOverflow(param + 1); }\n"
+                             "int main (int argc, char *argv[]) {\n"
+                             "  int jmpret;\n"
+                             "  AddVectoredExceptionHandler(1, stackOverflowHandler);\n"
+                             "  if ((jmpret = setjmp(jump_buffer)) == 0 ) {\n"
+                             "    stackOverflow(1);\n"
+                             "    printf(\"0\\n\");\n"
+                             "  } else {\n"
+                             "    printf(\"%d\\n\", jmpret);\n"
+                             "  } return 0; }\n") && doTest() == 1);
+  } /* determineAddVectoredExceptionHandler */
 
 
 
@@ -7477,7 +7585,7 @@ static void determinePartialLinking (FILE *versionFile)
 #endif
     if (!supportsPartialLinking) {
       appendToFile("macros", "LINKER_OPT_PARTIAL_LINKING =\n");
-      appendToFile("macros", "OBJCOPY = @echo \"No partial linking with objcopy\"\n");
+      appendToFile("macros", "OBJCOPY = echo \"***** No partial linking with objcopy\"\n");
     } /* if */
   } /* determinePartialLinking */
 
@@ -11648,7 +11756,9 @@ int main (int argc, char **argv)
     closeVersionFile(versionFile);
     copyFile(versionFileName, "tst_vers.h");
     versionFile = openVersionFile(versionFileName);
-    determineGetaddrlimit(versionFile);
+    determineGetrlimit(versionFile);
+    determineSigaltstack(versionFile);
+    determineAddVectoredExceptionHandler(versionFile);
     fprintf(versionFile, "#define STRCMP_RETURNS_SIGNUM %d\n",
         compileAndLinkOk("#include <stdio.h>\n#include <string.h>\n"
                          "int main(int argc, char *argv[]){\n"
@@ -11672,19 +11782,29 @@ int main (int argc, char **argv)
     fprintf(versionFile, "#define MEMCMP_WITH_SIZE_0_RETURNS_0 %d\n",
         compileAndLinkOk("#include <stdio.h>\n#include <string.h>\n"
                          "int main(int argc, char *argv[]){\n"
-                         "char stri1[3], stri2[3], *stri3, *stri4;\n"
+                         "char stri1[3], stri2[3], *stri3, *stri4, *stri5, *stri6;\n"
                          "int size;\n"
                          "strcpy(stri1, \"za\");\n"
                          "strcpy(stri2, \"az\");\n"
                          "stri3 = NULL;\n"
                          "stri4 = NULL;\n"
+                         "stri5 = (char *) malloc(3);\n"
+                         "strcpy(stri5, \"za\"); \n"
+                         "stri6 = (char *) malloc(3);\n"
+                         "strcpy(stri6, \"az\");\n"
                          "size = 0;\n"
                          "printf(\"%d\\n\",\n"
                          "       memcmp(stri1, stri2, size) == 0 &&\n"
                          "       memcmp(stri2, stri1, size) == 0 &&\n"
                          "       memcmp(stri1, stri4, size) == 0 &&\n"
                          "       memcmp(stri3, stri2, size) == 0 &&\n"
-                         "       memcmp(stri3, stri4, size) == 0);\n"
+                         "       memcmp(stri3, stri4, size) == 0 &&\n"
+                         "       memcmp(stri1, &stri5[3], size) == 0 &&\n"
+                         "       memcmp(&stri5[3], stri1, size) == 0 &&\n"
+                         "       memcmp(stri3, &stri5[3], size) == 0 &&\n"
+                         "       memcmp(&stri5[3], stri3, size) == 0 &&\n"
+                         "       memcmp(&stri5[3], &stri6[3], size) == 0 &&\n"
+                         "       memcmp(&stri5[3], &stri6[3], size) == 0);\n"
                          "return 0;}\n") && doTest() == 1);
     fprintf(versionFile, "#define HAS_WMEMCMP %d\n",
         compileAndLinkOk("#include <stdio.h>\n#include <wchar.h>\n"

@@ -1,8 +1,7 @@
 /********************************************************************/
 /*                                                                  */
-/*  sigutl.h      Driver shutdown and signal handling.              */
-/*  Copyright (C) 1990 - 2000, 2014, 2016, 2017  Thomas Mertes      */
-/*                2019, 2020, 2021, 2025  Thomas Mertes             */
+/*  segv_win.c    Stack overflow handler for Windows.               */
+/*  Copyright (C) 2026  Thomas Mertes                               */
 /*                                                                  */
 /*  This file is part of the Seed7 Runtime Library.                 */
 /*                                                                  */
@@ -24,20 +23,61 @@
 /*  Fifth Floor, Boston, MA  02110-1301, USA.                       */
 /*                                                                  */
 /*  Module: Seed7 Runtime Library                                   */
-/*  File: seed7/src/sigutl.h                                        */
-/*  Changes: 1990 - 2000, 2014, 2016, 2017, 2019  Thomas Mertes     */
-/*           2020, 2021, 2025  Thomas Mertes                        */
-/*  Content: Driver shutdown and signal handling.                   */
+/*  File: seed7/src/segv_win.c                                      */
+/*  Changes: 2026  Thomas Mertes                                    */
+/*  Content: Stack overflow handler for Windows.                    */
 /*                                                                  */
 /********************************************************************/
 
-typedef void (*suspendInterprType) (int signalNum);
+#define LOG_FUNCTIONS 0
+#define VERBOSE_EXCEPTIONS 0
+
+#include "version.h"
+
+#define _WIN32_WINNT 0x500
+#include <windows.h>
+#include <stdio.h>
+#include <setjmp.h>
+
+#include "common.h"
+#include "heaputl.h"
+
+static boolType stackOverflow = FALSE;
 
 
-void shutDrivers (void);
-const_cstriType signalName (int signalNum);
-void triggerSigfpe (void);
-void setupSignalHandlers (boolType handleSignals,
-    boolType traceSignals, boolType overflowSigError,
-    boolType fpeNumericError, suspendInterprType suspendInterpr);
-boolType callSignalHandler (int signalNum);
+static LONG WINAPI segmentationViolationHandler (PEXCEPTION_POINTERS pExp)
+
+  { /* segmentationViolationHandler */
+    logFunction(printf("segmentationViolationHandler\n"););
+    stackOverflow = pExp->ExceptionRecord->ExceptionCode ==
+                    EXCEPTION_STACK_OVERFLOW;
+    no_memory(SOURCE_POSITION(3021));
+    return 0;
+  } /* segmentationViolationHandler */
+
+
+
+boolType setupSegmentationViolationHandler (void)
+
+  {
+    boolType okay;
+
+  /* setupSegmentationViolationHandler */
+    logFunction(printf("setupSegmentationViolationHandler\n"););
+    okay = AddVectoredExceptionHandler(1, segmentationViolationHandler) != NULL;
+    logFunction(printf("setupSegmentationViolationHandler --> %d\n",
+                       okay););
+    return okay;
+  } /* setupSegmentationViolationHandler */
+
+
+
+void resetExceptionCheck (void)
+
+  { /* resetExceptionCheck */
+    logFunction(printf("resetExceptionCheck\n"););
+    if (stackOverflow) {
+      _resetstkoflw();
+      stackOverflow = FALSE;
+    } /* if */
+  } /* resetExceptionCheck */

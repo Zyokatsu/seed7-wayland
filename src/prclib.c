@@ -36,6 +36,7 @@
 #include "stdio.h"
 #include "string.h"
 #include "limits.h"
+#include "setjmp.h"
 
 #include "common.h"
 #include "sigutl.h"
@@ -61,14 +62,23 @@
 #include "actutl.h"
 #include "scanner.h"
 #include "libpath.h"
+#include "infile.h"
 #include "error.h"
 #include "set_rtl.h"
 #include "str_rtl.h"
+#include "segv_drv.h"
 #include "rtl_err.h"
 
 #undef EXTERN
 #define EXTERN
 #include "prclib.h"
+
+
+typedef longjmpPosition catch_type;
+extern catch_type *catch_stack;
+extern size_t catch_stack_pos;
+extern size_t max_catch_stack;
+extern objectType last_exception;
 
 
 
@@ -279,8 +289,24 @@ objectType prc_block (listType arguments)
     boolType searching;
 
   /* prc_block */
+    logFunction(printf("prc_block\n"););
     statement = arg_2(arguments);
-    evaluate(statement);
+    catch_stack_pos++;
+    if (unlikely(catch_stack_pos >= max_catch_stack)) {
+      if (unlikely(!resizeCatchStackOkay())) {
+        /* Don't handle this error in the catch below. */
+        return raise_exception(SYS_MEM_EXCEPTION);
+      } /* if */
+    } /* if */
+    if (likely(do_setjmp(catch_stack[catch_stack_pos]) == 0)) {
+      evaluate(statement);
+    } else {
+      logMessage(printf("prc_block: MEMORY_ERROR cought\n");)
+      resetExceptionCheck();
+      set_fail_flag(TRUE);
+      fail_value = SYS_MEM_EXCEPTION;
+    } /* if */
+    catch_stack_pos--;
     if (unlikely(fail_flag && catch_exceptions)) {
       searching = TRUE;
       current_catch = arg_4(arguments);
@@ -302,6 +328,7 @@ objectType prc_block (listType arguments)
         } /* if */
       } /* while */
     } /* if */
+    logFunction(printf("prc_block -->\n"););
     return SYS_EMPTY_OBJECT;
   } /* prc_block */
 
@@ -314,13 +341,30 @@ objectType prc_block_catch_all (listType arguments)
     objectType default_statement;
 
   /* prc_block_catch_all */
+    logFunction(printf("prc_block_catch_all\n"););
     statement = arg_2(arguments);
-    evaluate(statement);
+    catch_stack_pos++;
+    if (unlikely(catch_stack_pos >= max_catch_stack)) {
+      if (unlikely(!resizeCatchStackOkay())) {
+        /* Don't handle this error in the catch below. */
+        return raise_exception(SYS_MEM_EXCEPTION);
+      } /* if */
+    } /* if */
+    if (likely(do_setjmp(catch_stack[catch_stack_pos]) == 0)) {
+      evaluate(statement);
+    } else {
+      logMessage(printf("prc_block_catch_all: MEMORY_ERROR cought\n");)
+      resetExceptionCheck();
+      set_fail_flag(TRUE);
+      fail_value = SYS_MEM_EXCEPTION;
+    } /* if */
+    catch_stack_pos--;
     if (unlikely(fail_flag && catch_exceptions)) {
       default_statement = arg_6(arguments);
       leaveExceptionHandling();
       evaluate(default_statement);
     } /* if */
+    logFunction(printf("prc_block_catch_all -->\n"););
     return SYS_EMPTY_OBJECT;
   } /* prc_block_catch_all */
 
@@ -337,8 +381,24 @@ objectType prc_block_otherwise (listType arguments)
     boolType searching;
 
   /* prc_block_otherwise */
+    logFunction(printf("prc_block_otherwise\n"););
     statement = arg_2(arguments);
-    evaluate(statement);
+    catch_stack_pos++;
+    if (unlikely(catch_stack_pos >= max_catch_stack)) {
+      if (unlikely(!resizeCatchStackOkay())) {
+        /* Don't handle this error in the catch below. */
+        return raise_exception(SYS_MEM_EXCEPTION);
+      } /* if */
+    } /* if */
+    if (likely(do_setjmp(catch_stack[catch_stack_pos]) == 0)) {
+      evaluate(statement);
+    } else {
+      logMessage(printf("prc_block_otherwise: MEMORY_ERROR cought\n");)
+      resetExceptionCheck();
+      set_fail_flag(TRUE);
+      fail_value = SYS_MEM_EXCEPTION;
+    } /* if */
+    catch_stack_pos--;
     if (unlikely(fail_flag && catch_exceptions)) {
       searching = TRUE;
       current_catch = arg_4(arguments);
@@ -365,6 +425,7 @@ objectType prc_block_otherwise (listType arguments)
         evaluate(otherwise_statement);
       } /* if */
     } /* if */
+    logFunction(printf("prc_block_otherwise -->\n"););
     return SYS_EMPTY_OBJECT;
   } /* prc_block_otherwise */
 
@@ -947,7 +1008,7 @@ objectType prc_exit (listType arguments)
       logError(printf("prc_exit(" FMT_D "): "
                       "Exit status not in allowed range (%d .. %d).\n",
                       status, INT_MIN, INT_MAX););
-      raise_error(RANGE_ERROR);
+      return raise_exception(SYS_RNG_EXCEPTION);
     } else {
       shutDrivers();
       os_exit((int) status);
@@ -1090,6 +1151,58 @@ objectType prc_for_to_step (listType arguments)
     } /* while */
     return SYS_EMPTY_OBJECT;
   } /* prc_for_to_step */
+
+
+
+objectType prc_get_run_error (listType arguments)
+
+  {
+    int exceptionNum;
+    striType file_name;
+    intType line;
+
+  /* prc_get_run_error */
+    logMessage(printf("prc_get_run_error\n"););
+    isit_int(arg_1(arguments));
+    isit_stri(arg_2(arguments));
+    isit_int(arg_3(arguments));
+    logMessage(printf("prc_get_run_error: last_exception: ");
+               trace1(last_exception);
+               printf("\n"););
+    if (exception_number == 0 && last_exception != NULL) {
+      for (exceptionNum = FIRST_EXCEPTION_SYS_VAR;
+           exceptionNum <= LAST_EXCEPTION_SYS_VAR;
+           exceptionNum++) {
+        if (prog->sys_var[exceptionNum] == last_exception) {
+          exception_number = exceptionNum;
+          exceptionNum = LAST_EXCEPTION_SYS_VAR;
+        } /* if */
+      } /* for */
+    } /* if */
+    if (error_file != NULL) {
+      file_name = cstri8_or_cstri_to_stri(error_file);
+    } else {
+      file_name = strCreate(get_file_name(prog, fail_file_number));
+    } /* if */
+    if (unlikely(file_name == NULL)) {
+      return raise_exception(SYS_MEM_EXCEPTION);
+    } else {
+      if (error_line != 0) {
+        line = (intType) error_line;
+      } else {
+        line = (intType) fail_line_number;
+      } /* if */
+      arg_1(arguments)->value.intValue = (intType) exception_number;
+      strDestr(take_stri(arg_2(arguments)));
+      arg_2(arguments)->value.striValue = file_name;
+      arg_3(arguments)->value.intValue = line;
+    } /* if */
+    logFunction(printf("prc_get_run_error --> " FMT_D " %s(" FMT_D ")\n",
+                       (intType) exception_number,
+                       striAsUnquotedCStri(file_name),
+                       line););
+    return SYS_EMPTY_OBJECT;
+  } /* prc_get_run_error */
 
 
 
@@ -1588,8 +1701,10 @@ objectType prc_return (listType arguments)
     blockType block;
 
   /* prc_return */
-    logFunction(printf("prc_return\n"););
     block_body = arg_2(arguments);
+    logFunction(printf("prc_return(");
+                trace1(block_body);
+                printf(")\n"););
     proc_exec_object = curr_exec_object;
     if (CATEGORY_OF_OBJ(block_body) == EXPROBJECT &&
         block_body->value.listValue != NULL &&
@@ -1598,6 +1713,9 @@ objectType prc_return (listType arguments)
       block_body = block_body->value.listValue->obj;
     } /* if */
     block_body = copy_expression(block_body, &err_info);
+    logMessage(printf("prc_return: block_body=");
+               trace1(block_body);
+               printf("\n"););
     if (unlikely(err_info != OKAY_NO_ERROR)) {
       logError(printf("prc_return: No memory\n"););
       return raise_with_obj_and_args(SYS_MEM_EXCEPTION,
@@ -1616,11 +1734,9 @@ objectType prc_return (listType arguments)
         fix_posinfo(block_body, block_body_list);
       } /* if */
       pop_stack();
-#ifdef OUT_OF_ORDER
-      printf("prc_return block_body=");
-      trace1(block_body);
-      printf("\n");
-#endif
+      logMessage(printf("prc_return: block_body=");
+                 trace1(block_body);
+                 printf("\n"););
       if (block_body != NULL) {
         return_type = block_body->type_of;
         if (return_type->result_type != NULL) {
@@ -1629,11 +1745,11 @@ objectType prc_return (listType arguments)
       } else {
         return_type = NULL;
       } /* if */
-#ifdef OUT_OF_ORDER
-      printf("return_type=");
-      trace1(return_type->match_obj);
-      printf("\n");
-#endif
+      logMessage(printf("prc_return: return_type=");
+                 if (return_type != NULL) {
+                   trace1(return_type->match_obj);
+                 }
+                 printf("\n"););
       get_return_var(&return_var, return_type, &err_info);
       if (unlikely(err_info != OKAY_NO_ERROR)) {
         logError(printf("prc_return: error - err_info: %d\n", err_info););
@@ -1672,8 +1788,10 @@ objectType prc_return2 (listType arguments)
     blockType block;
 
   /* prc_return2 */
-    logFunction(printf("prc_return2\n"););
     block_body = arg_3(arguments);
+    logFunction(printf("prc_return2(");
+                trace1(block_body);
+                printf(")\n"););
     proc_exec_object = curr_exec_object;
     if (CATEGORY_OF_OBJ(block_body) == EXPROBJECT &&
         block_body->value.listValue != NULL &&
@@ -1682,6 +1800,9 @@ objectType prc_return2 (listType arguments)
       block_body = block_body->value.listValue->obj;
     } /* if */
     block_body = copy_expression(block_body, &err_info);
+    logMessage(printf("prc_return2: block_body=");
+               trace1(block_body);
+               printf("\n"););
     if (unlikely(err_info != OKAY_NO_ERROR)) {
       logError(printf("prc_return2: No memory\n"););
       return raise_with_obj_and_args(SYS_MEM_EXCEPTION,
@@ -1700,11 +1821,9 @@ objectType prc_return2 (listType arguments)
         fix_posinfo(block_body, block_body_list);
       } /* if */
       pop_stack();
-#ifdef OUT_OF_ORDER
-      printf("prc_return2 block_body=");
-      trace1(block_body);
-      printf("\n");
-#endif
+      logMessage(printf("prc_return2: block_body=");
+                 trace1(block_body);
+                 printf("\n"););
       if (block_body != NULL) {
         return_type = block_body->type_of;
         if (return_type->result_type != NULL) {
@@ -1713,11 +1832,11 @@ objectType prc_return2 (listType arguments)
       } else {
         return_type = NULL;
       } /* if */
-#ifdef OUT_OF_ORDER
-      printf("return_type=");
-      trace1(return_type->match_obj);
-      printf("\n");
-#endif
+      logMessage(printf("prc_return2: return_type=");
+                 if (return_type != NULL) {
+                   trace1(return_type->match_obj);
+                 }
+                 printf("\n"););
       get_return_var(&return_var, return_type, &err_info);
       if (unlikely(err_info != OKAY_NO_ERROR)) {
         logError(printf("prc_return2: error - err_info: %d\n", err_info););

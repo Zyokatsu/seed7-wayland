@@ -41,9 +41,15 @@
 #include "sys/types.h"
 #include "sys/resource.h"
 #endif
+#include "signal.h"
+#include "setjmp.h"
 
 #include "common.h"
 #include "data_rtl.h"
+#include "os_decls.h"
+#include "sigutl.h"
+#include "striutl.h"
+#include "str_rtl.h"
 #include "rtl_err.h"
 
 #undef EXTERN
@@ -66,6 +72,53 @@ boolType interpreter_exception = FALSE;
 #else
 extern boolType interpreter_exception;
 #endif
+
+#define CATCH_STACK_INCREMENT 128
+typedef longjmpPosition catch_type;
+catch_type *catch_stack;
+size_t catch_stack_pos;
+size_t max_catch_stack;
+
+
+
+#if HAS_SIGALTSTACK && !SIGNAL_STACK_ENABLED
+static void *signalStack = NULL;
+
+
+
+static void alternateSignalStack (void)
+
+  {
+    stack_t ss;
+    boolType okay = FALSE;
+
+  /* alternateSignalStack */
+    logFunction(printf("alternateSignalStack\n"););
+    signalStack = malloc(SIGSTKSZ);
+    if (signalStack != NULL) {
+      ss.ss_sp = signalStack;
+      ss.ss_flags = 0;
+      ss.ss_size = SIGSTKSZ;
+      if (sigaltstack(&ss, NULL) == 0) {
+        okay = TRUE;
+      } /* if */
+    } /* if */
+    logFunction(printf("alternateSignalStack --> %s\n",
+                       okay ? "OKAY" : "NOT OKAY"););
+  } /* alternateSignalStack */
+
+#endif
+
+
+
+static void closeStack (void)
+
+  { /* closeStack */
+    logFunction(printf("closeStack\n"););
+#if HAS_SIGALTSTACK
+    free(signalStack);
+#endif
+  } /* closeStack */
 
 
 
@@ -102,12 +155,104 @@ void setupStack (memSizeType stackSize)
       } /* if */
     } /* if */
 #endif
+#if HAS_SIGALTSTACK && !SIGNAL_STACK_ENABLED
+    alternateSignalStack();
+#endif
+    catch_stack_pos = 0;
+    max_catch_stack = CATCH_STACK_INCREMENT;
+    catch_stack = (catch_type *) malloc(max_catch_stack * sizeof(catch_type));
 #if CHECK_STACK
     stack_base = &aVariable;
     /* printf("base:  " F_U_MEM(8) "\n", (memSizeType) stack_base); */
 #endif
+    os_atexit(closeStack);
     logFunction(printf("setupStack -->\n"););
   } /* setupStack */
+
+
+
+boolType resizeCatchStackOkay (void)
+
+  {
+    catch_type *resized_stack;
+    boolType okay = TRUE;
+
+  /* resizeCatchStackOkay */
+    max_catch_stack += CATCH_STACK_INCREMENT;
+    resized_stack = (catch_type *) realloc(catch_stack, max_catch_stack * sizeof(catch_type));
+    if (unlikely(resized_stack == NULL)) {
+      catch_stack_pos--;
+      okay = FALSE;
+    } else {
+      catch_stack = resized_stack;
+    } /* if */
+    return okay;
+  } /* resizeCatchStackOkay */
+
+
+
+void resize_catch_stack (void)
+
+  {
+    catch_type *resized_stack;
+
+  /* resize_catch_stack */
+    max_catch_stack += CATCH_STACK_INCREMENT;
+    resized_stack = (catch_type *) realloc(catch_stack, max_catch_stack * sizeof(catch_type));
+    if (unlikely(resized_stack == NULL)) {
+      catch_stack_pos--;
+      raise_error(MEMORY_ERROR);
+    } else {
+      catch_stack = resized_stack;
+    } /* if */
+  } /* resize_catch_stack */
+
+
+
+void no_memory (const_cstriType source_file, int source_line)
+
+  { /* no_memory */
+    logFunction(printf("no_memory(\"%s\", %d)\n", source_file, source_line););
+    exception_number = MEMORY_ERROR;
+    error_file = source_file;
+    error_line = source_line;
+    if (catch_stack_pos > 0) {
+      logFunction(printf("no_memory(\"%s\", %d) --> longjmp\n",
+                         source_file, source_line););
+      do_longjmp(catch_stack[catch_stack_pos], MEMORY_ERROR);
+    } else {
+      /* shutDrivers(); */
+      logFunction(printf("no_memory(\"%s\", %d) --> exit\n",
+                         source_file, source_line););
+      os_exit(1);
+    } /* if */
+  } /* no_memory */
+
+
+
+void prcGetRunError (intType *exceptionNumber, striType *fileName,
+    intType *lineNumber)
+
+  {
+    striType file_name;
+
+  /* prcGetRunError */
+    logMessage(printf("prcGetRunError\n"););
+    if (error_file != NULL) {
+      file_name = cstri8_or_cstri_to_stri(error_file);
+    } else {
+      file_name = cstri_to_stri("");
+    } /* if */
+    if (unlikely(file_name == NULL)) {
+      raise_error(MEMORY_ERROR);
+    } else {
+      *exceptionNumber = (intType) exception_number;
+      FREE_STRI(*fileName);
+      *fileName = file_name;
+      *lineNumber = (intType) error_line;
+    } /* if */
+    logFunction(printf("prcGetRunError --> \n"););
+  } /* prcGetRunError */
 
 
 

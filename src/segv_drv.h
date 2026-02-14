@@ -1,8 +1,7 @@
 /********************************************************************/
 /*                                                                  */
-/*  sigutl.h      Driver shutdown and signal handling.              */
-/*  Copyright (C) 1990 - 2000, 2014, 2016, 2017  Thomas Mertes      */
-/*                2019, 2020, 2021, 2025  Thomas Mertes             */
+/*  segv_drv.c    Driver for stack overflow handlers.               */
+/*  Copyright (C) 2026  Thomas Mertes                               */
 /*                                                                  */
 /*  This file is part of the Seed7 Runtime Library.                 */
 /*                                                                  */
@@ -24,20 +23,16 @@
 /*  Fifth Floor, Boston, MA  02110-1301, USA.                       */
 /*                                                                  */
 /*  Module: Seed7 Runtime Library                                   */
-/*  File: seed7/src/sigutl.h                                        */
-/*  Changes: 1990 - 2000, 2014, 2016, 2017, 2019  Thomas Mertes     */
-/*           2020, 2021, 2025  Thomas Mertes                        */
-/*  Content: Driver shutdown and signal handling.                   */
+/*  File: seed7/src/segv_drv.h                                      */
+/*  Changes: 2026  Thomas Mertes                                    */
+/*  Content: Driver for stack overflow handlers.                    */
 /*                                                                  */
 /********************************************************************/
 
-typedef void (*suspendInterprType) (int signalNum);
-
-
-void shutDrivers (void);
-const_cstriType signalName (int signalNum);
-void triggerSigfpe (void);
-void setupSignalHandlers (boolType handleSignals,
-    boolType traceSignals, boolType overflowSigError,
-    boolType fpeNumericError, suspendInterprType suspendInterpr);
-boolType callSignalHandler (int signalNum);
+#if HAS_VECTORED_EXCEPTION_HANDLER
+boolType setupSegmentationViolationHandler (void);
+void resetExceptionCheck (void);
+#else
+#define setupSegmentationViolationHandler() TRUE
+#define resetExceptionCheck()
+#endif

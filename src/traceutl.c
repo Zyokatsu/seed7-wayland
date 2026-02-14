@@ -713,6 +713,9 @@ void printobject (const_objectType anyobject)
       if (TEMP2_OBJECT(anyobject)) {
         prot_cstri("[TEMP2] ");
       } /* if */
+      if (TEMP_DYNAMIC_OBJECT(anyobject)) {
+        prot_cstri("[TEMP_DYNAMIC] ");
+      } /* if */
       if (IS_UNUSED(anyobject)) {
         prot_cstri("[UNUSED] ");
       } /* if */
@@ -1578,6 +1581,9 @@ void trace1 (const_objectType traceobject)
       if (TEMP2_OBJECT(traceobject)) {
         prot_cstri(" [TEMP2]");
       } /* if */
+      if (TEMP_DYNAMIC_OBJECT(traceobject)) {
+        prot_cstri("[TEMP_DYNAMIC] ");
+      } /* if */
       if (IS_UNUSED(traceobject)) {
         prot_cstri(" [UNUSED]");
       } /* if */
@@ -1764,6 +1770,7 @@ void set_protfile_name (const const_striType protfile_name)
         if (protfile->cFile == NULL) {
           protfile->cFile = stdout;
         } /* if */
+        setvbuf(protfile->cFile, NULL, _IOLBF, 0);
       } /* if */
     } else if (protfile->cFile == NULL) {
       protfile->cFile = stdout;

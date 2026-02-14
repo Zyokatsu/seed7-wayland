@@ -804,12 +804,16 @@ const proc: process_action (in reference: function, in ref_list: params,
         process(ENU_EQ, function, params, c_expr);
       when {"ENU_ICONV2"}:
         process(ENU_ICONV2, function, params, c_expr);
+      when {"ENU_ICONV3_EXCEPT"}:
+        process(ENU_ICONV3_EXCEPT, function, params, c_expr);
       when {"ENU_LIT"}:
         process(ENU_LIT, function, params, c_expr);
       when {"ENU_NE"}:
         process(ENU_NE, function, params, c_expr);
       when {"ENU_ORD2"}:
         process(ENU_ORD2, function, params, c_expr);
+      when {"ENU_ORD_EXCEPT"}:
+        process(ENU_ORD_EXCEPT, function, params, c_expr);
       when {"ENU_VALUE"}:
         process(ENU_VALUE, function, params, c_expr);
       when {"FIL_BIG_LNG"}:
@@ -1376,6 +1380,8 @@ const proc: process_action (in reference: function, in ref_list: params,
         process(PRC_FOR_TO, function, params, c_expr);
       when {"PRC_FOR_TO_STEP"}:
         process(PRC_FOR_TO_STEP, function, params, c_expr);
+      when {"PRC_GET_RUN_ERROR"}:
+        process(PRC_GET_RUN_ERROR, function, params, c_expr);
       when {"PRC_HEAPSTAT"}:
         process(PRC_HEAPSTAT, function, params, c_expr);
       when {"PRC_HSIZE"}:
@@ -1452,8 +1458,6 @@ const proc: process_action (in reference: function, in ref_list: params,
         process(PRG_SYSVAR, function, params, c_expr);
       when {"PRG_VALUE"}:
         process(PRG_VALUE, function, params, c_expr);
-      when {"REF_ADDR"}:
-        process(REF_ADDR, function, params, c_expr);
       when {"REF_ALLOC"}:
         process(REF_ALLOC, function, params, c_expr);
       when {"REF_ALLOC_INT"}:
@@ -1482,8 +1486,6 @@ const proc: process_action (in reference: function, in ref_list: params,
         process(REF_CMP, function, params, c_expr);
       when {"REF_CPY"}:
         process(REF_CPY, function, params, c_expr);
-      when {"REF_DEREF"}:
-        process(REF_DEREF, function, params, c_expr);
       when {"REF_EQ"}:
         process(REF_EQ, function, params, c_expr);
       when {"REF_FILE"}:

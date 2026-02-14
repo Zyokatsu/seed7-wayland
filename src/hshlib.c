@@ -990,6 +990,13 @@ objectType hsh_for_key (listType arguments)
 
 
 
+/**
+ *  Create a hash literal from key-value pairs.
+ *  One or many key-value pairs are used to create a hash literal:
+ *   [] (["one" : 1], ["two" : 2])
+ *  This hash literal defines a hash with the keys "one" and "two"
+ *  and the corresponding values 1 and 2.
+ */
 objectType hsh_gen_hash (listType arguments)
 
   {
@@ -1093,6 +1100,15 @@ objectType hsh_gen_hash (listType arguments)
 
 
 
+/**
+ *  Create a key-value pair to be used in a hash literal.
+ *  A key-value pair with the key "one" and the value 1 is created with
+ *   ["one" : 1]
+ *  A key-value pair can only be used inside a hash literal. E.g.:
+ *   [] (["one" : 1], ["two" : 2])
+ *  This hash literal defines a hash with the keys "one" and "two"
+ *  and the corresponding values 1 and 2.
+ */
 objectType hsh_gen_key_value (listType arguments)
 
   {
@@ -1320,10 +1336,10 @@ objectType hsh_idx2 (listType arguments)
       } else {
         result->type_of = defaultValue->type_of;
         result->descriptor.property = NULL;
-        if (TEMP2_OBJECT(arg_3(arguments))) {
+        if (TEMP2_OBJECT(arg_4(arguments))) {
           INIT_CATEGORY_OF_TEMP(result, CATEGORY_OF_OBJ(defaultValue));
           result->value = defaultValue->value;
-          memset(&arg_3(arguments)->value, 0, sizeof(valueUnion));
+          memset(&arg_4(arguments)->value, 0, sizeof(valueUnion));
         } else {
           INIT_CATEGORY_OF_OBJ(result, DECLAREDOBJECT);
           param3_call(data_create_func, result, SYS_CREA_OBJECT, defaultValue);
@@ -1501,8 +1517,7 @@ objectType hsh_rand_key (listType arguments)
     /* printf("num_elements " FMT_U_MEM "\n", num_elements); */
     if (unlikely(num_elements == 0)) {
       logError(printf("hsh_rand_key(): Hash map is empty.\n"););
-      raise_error(RANGE_ERROR);
-      result = NULL;
+      result = raise_exception(SYS_RNG_EXCEPTION);
     } else {
       elem_index = (memSizeType) (uintType)
           intRand((intType) 1, (intType) num_elements);

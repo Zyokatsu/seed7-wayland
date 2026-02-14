@@ -39,6 +39,7 @@ const ACTION: PRC_FOR_DOWNTO       is action "PRC_FOR_DOWNTO";
 const ACTION: PRC_FOR_DOWNTO_STEP  is action "PRC_FOR_DOWNTO_STEP";
 const ACTION: PRC_FOR_TO           is action "PRC_FOR_TO";
 const ACTION: PRC_FOR_TO_STEP      is action "PRC_FOR_TO_STEP";
+const ACTION: PRC_GET_RUN_ERROR    is action "PRC_GET_RUN_ERROR";
 const ACTION: PRC_HEAPSTAT         is action "PRC_HEAPSTAT";
 const ACTION: PRC_HSIZE            is action "PRC_HSIZE";
 const ACTION: PRC_IF               is action "PRC_IF";
@@ -63,6 +64,12 @@ const proc: prc_prototypes (inout file: c_prog) is func
   begin
     declareExtern(c_prog, "genericType hshIdxDefault0 (const const_hashType, const genericType, intType, compareType);");
     declareExtern(c_prog, "void        heapStatistic (void);");
+    declareExtern(c_prog, "void        prcGetRunError (intType *, striType *, intType *);");
+    if ccConf.HAS_VECTORED_EXCEPTION_HANDLER then
+      declareExtern(c_prog, "void        resetExceptionCheck (void);");
+    else
+      writeln(c_prog, "#define     resetExceptionCheck()");
+    end if;
   end func;
 
 
@@ -1010,6 +1017,8 @@ const proc: process (PRC_BLOCK, in reference: function,
     c_expr.expr &:= diagnosticLine(current_catch);
     c_expr.expr &:= "} else {\n";
     setDiagnosticLine(c_expr);
+    c_expr.expr &:= "resetExceptionCheck();\n";
+    setDiagnosticLine(c_expr);
     c_expr.expr &:= "catch_stack_pos--;\n";
     # c_expr.expr &:= "printf(\"catch %d\\n\", fail_value);\n";
     while current_catch <> NIL and
@@ -1020,7 +1029,7 @@ const proc: process (PRC_BLOCK, in reference: function,
       c_expr.expr &:= diagnosticLine(current_catch);
       c_expr.expr &:= "if (";
       process_expr(catch_value, c_expr);
-      c_expr.expr &:= " == fail_value - 1) {\n";
+      c_expr.expr &:= " == fail_value) {\n";
       process_call_by_name_expr(catch_expr[5], c_expr);
       if length(catch_expr) >= 6 then
         c_expr.expr &:= diagnosticLine(current_catch);
@@ -1071,6 +1080,8 @@ const proc: process (PRC_BLOCK_CATCH_ALL, in reference: function,
     setDiagnosticLine(c_expr);
     c_expr.expr &:= "} else {\n";
     setDiagnosticLine(c_expr);
+    c_expr.expr &:= "resetExceptionCheck();\n";
+    setDiagnosticLine(c_expr);
     c_expr.expr &:= "catch_stack_pos--;\n";
     checkWarning(CATCH_OTHERWISE_WITH_SUPPRESSED_CHECK, params[6]);
     process_call_by_name_expr(params[6], c_expr);
@@ -1115,6 +1126,8 @@ const proc: process (PRC_BLOCK_OTHERWISE, in reference: function,
     c_expr.expr &:= diagnosticLine(current_catch);
     c_expr.expr &:= "} else {\n";
     setDiagnosticLine(c_expr);
+    c_expr.expr &:= "resetExceptionCheck();\n";
+    setDiagnosticLine(c_expr);
     c_expr.expr &:= "catch_stack_pos--;\n";
     # c_expr.expr &:= "printf(\"catch %d\\n\", fail_value);\n";
     while current_catch <> NIL and
@@ -1125,7 +1138,7 @@ const proc: process (PRC_BLOCK_OTHERWISE, in reference: function,
       c_expr.expr &:= diagnosticLine(current_catch);
       c_expr.expr &:= "if (";
       process_expr(catch_value, c_expr);
-      c_expr.expr &:= " == fail_value - 1) {\n";
+      c_expr.expr &:= " == fail_value) {\n";
       process_call_by_name_expr(catch_expr[5], c_expr);
       if length(catch_expr) >= 6 then
         c_expr.expr &:= diagnosticLine(current_catch);
@@ -1170,6 +1183,20 @@ const proc: process (PRC_EXIT, in reference: function,
     c_expr.expr &:= "doExit(";
     process_expr(params[1], c_expr);
     c_expr.expr &:= ");\n";
+  end func;
+
+
+const proc: process (PRC_GET_RUN_ERROR, in reference: function,
+    in ref_list: params, inout expr_type: c_expr) is func
+
+  begin
+    c_expr.expr &:= "prcGetRunError(&(";
+    process_expr(params[1], c_expr);
+    c_expr.expr &:= "), &(";
+    process_expr(params[2], c_expr);
+    c_expr.expr &:= "), &(";
+    process_expr(params[3], c_expr);
+    c_expr.expr &:= "));\n";
   end func;
 
 
@@ -1293,6 +1320,7 @@ const proc: process (PRC_NOOP, in reference: function,
     in ref_list: params, inout expr_type: c_expr) is func
 
   begin
+    setDiagnosticLine(c_expr);
     c_expr.expr &:= "/*noop*/";
     noop_params(formalParams(function), params, c_expr);
     c_expr.expr &:= "\n";
@@ -1368,7 +1396,7 @@ const proc: process (PRC_RAISE, in reference: function,
     setDiagnosticLine(c_expr);
     c_expr.expr &:= "rtlRaiseError(";
     getAnyParamToExpr(params[2], c_expr);
-    c_expr.expr &:= "+1, ";
+    c_expr.expr &:= ", ";
     c_expr.expr &:= sourceNameString(c_expr.currentFile);
     c_expr.expr &:= ", ";
     c_expr.expr &:= str(c_expr.currentLine);

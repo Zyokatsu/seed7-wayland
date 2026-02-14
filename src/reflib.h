@@ -25,7 +25,6 @@
 /*                                                                  */
 /********************************************************************/
 
-objectType ref_addr          (listType arguments);
 objectType ref_alloc         (listType arguments);
 objectType ref_alloc_int     (listType arguments);
 objectType ref_alloc_stri    (listType arguments);
@@ -35,16 +34,13 @@ objectType ref_arrmaxidx     (listType arguments);
 objectType ref_arrminidx     (listType arguments);
 objectType ref_arrtolist     (listType arguments);
 objectType ref_body          (listType arguments);
-objectType ref_cast          (listType arguments);
 objectType ref_category      (listType arguments);
 objectType ref_cat_parse     (listType arguments);
 objectType ref_cat_str       (listType arguments);
 objectType ref_cmp           (listType arguments);
-objectType ref_content       (listType arguments);
 objectType ref_conv          (listType arguments);
 objectType ref_cpy           (listType arguments);
 objectType ref_create        (listType arguments);
-objectType ref_deref         (listType arguments);
 objectType ref_eq            (listType arguments);
 objectType ref_file          (listType arguments);
 objectType ref_getref        (listType arguments);
@@ -59,16 +55,13 @@ objectType ref_itftosct      (listType arguments);
 objectType ref_line          (listType arguments);
 objectType ref_local_consts  (listType arguments);
 objectType ref_local_vars    (listType arguments);
-objectType ref_mkref         (listType arguments);
 objectType ref_ne            (listType arguments);
 objectType ref_nil           (listType arguments);
 objectType ref_num           (listType arguments);
 objectType ref_params        (listType arguments);
 objectType ref_path          (listType arguments);
-objectType ref_prog          (listType arguments);
 objectType ref_resini        (listType arguments);
 objectType ref_result        (listType arguments);
-objectType ref_scan          (listType arguments);
 objectType ref_scttolist     (listType arguments);
 objectType ref_select        (listType arguments);
 objectType ref_setcategory   (listType arguments);

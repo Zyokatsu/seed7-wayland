@@ -32,6 +32,8 @@ include "x509cert.s7i";
 include "hmac.s7i";
 include "elliptic.s7i";
 include "cipher.s7i";
+include "signature.s7i";
+include "asn1oid.s7i";
 include "arc4.s7i";
 include "des.s7i";
 include "tdes.s7i";
@@ -471,24 +473,6 @@ const proc: storeKeys (inout tlsParameters: parameters) is func
   end func;
 
 
-const func string: genRsaSignature (in string: signature, in digestAlgorithm: digestAlg) is func
-  result
-    var string: signatureString is "";
-  local
-    var algorithmIdentifierType: algorithmIdentifier is algorithmIdentifierType.value;
-  begin
-    case digestAlg of
-      when {SHA1}:   algorithmIdentifier.algorithm := SHA1_OID;
-      when {SHA256}: algorithmIdentifier.algorithm := SHA256_OID;
-      when {SHA384}: algorithmIdentifier.algorithm := SHA384_OID;
-      when {SHA512}: algorithmIdentifier.algorithm := SHA512_OID;
-    end case;
-    signatureString := genAsn1Sequence(
-            genAlgorithmIdentifier(algorithmIdentifier) &
-            genAsn1Element(tagOctetString, signature));
-  end func;
-
-
 const func boolean: verifySignature (in string: hashParameter, in integer: signatureScheme,
     in string: signatureStri, in tlsParameters: parameters, inout tlsParseState: state) is func
   result
@@ -555,9 +539,6 @@ const func string: genSignature (in string: hashParameter, in tlsParameters: par
             genAsn1Element(tagInteger, bytes(ecdsaSignature.r, SIGNED, BE)) &
             genAsn1Element(tagInteger, bytes(ecdsaSignature.s, SIGNED, BE)));
     end case;
-    signatureStri := bytes(parameters.signatureScheme, UNSIGNED, BE, 2) &
-                     bytes(length(signatureStri),      UNSIGNED, BE, 2) &
-                     signatureStri;
   end func;
 
 
@@ -1341,6 +1322,9 @@ const func string: genServerKeyExchange (inout tlsParameters: parameters) is fun
       signatureStri := genSignature(parameters.client_random &
                                     parameters.server_random &
                                     serverParams, parameters);
+      signatureStri := bytes(parameters.signatureScheme, UNSIGNED, BE, 2) &
+                       bytes(length(signatureStri),      UNSIGNED, BE, 2) &
+                       signatureStri;
       serverKeyExchange &:= serverParams & signatureStri;
     end if;
     length := length(serverKeyExchange);
