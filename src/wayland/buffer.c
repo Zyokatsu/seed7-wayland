@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
+// Copied from ../rtl_err.h
+#define raise_error(num) raise_error2(num, __FILE__, __LINE__)
+void raise_error2 (int exception_num, const_cstriType fileName, int line);
 
 /*- Wayland Buffers and Drawing --------
 --------------------------------------*/
@@ -84,6 +87,7 @@ boolType prepare_buffer_data (struct ClientState *state, way_winType window)
       { free(window->buffer);
         window->buffer = NULL;
         buffer = NULL;
+        raise_error(MEMORY_ERROR);
         return FALSE;
       }
     }
@@ -98,7 +102,11 @@ boolType prepare_buffer_data (struct ClientState *state, way_winType window)
 
       if (window->buffer->content != MAP_FAILED)
       { struct wl_shm_pool *pool = wl_shm_create_pool(state->sharedMemory, fd, buffer->contentSize);
-        buffer->waylandData = wl_shm_pool_create_buffer(pool, 0, buffer->width, buffer->height, stride, AlphaEnabled ? WL_SHM_FORMAT_ARGB8888 : WL_SHM_FORMAT_XRGB8888);
+#ifdef USE_ALPHA
+        buffer->waylandData = wl_shm_pool_create_buffer(pool, 0, buffer->width, buffer->height, stride, WL_SHM_FORMAT_ARGB8888);
+#else
+        buffer->waylandData = wl_shm_pool_create_buffer(pool, 0, buffer->width, buffer->height, stride, WL_SHM_FORMAT_XRGB8888);
+#endif
         wl_shm_pool_destroy(pool);
       }
 
@@ -110,6 +118,7 @@ boolType prepare_buffer_data (struct ClientState *state, way_winType window)
     { free(buffer);
       buffer = NULL;
       window->buffer = NULL;
+      raise_error(MEMORY_ERROR);
       return FALSE;
     }
   }
@@ -123,7 +132,7 @@ boolType prepare_buffer_copy (struct ClientState *state, way_winType window)
 {
   uint32_t *oldContent = window->buffer ? window->buffer->content : 0;
 
-  if (prepare_buffer_data(&waylandState, window))
+  if (prepare_buffer_data(state, window))
   { // Copy over the old data.
     if (oldContent)
       for (int y = 0; y < window->buffer->height; y++)

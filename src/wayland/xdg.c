@@ -16,7 +16,7 @@ void xdg_surface_configure (void *data, struct xdg_surface *surface, uint32_t se
   // struct ClientState *state = data;
   way_winType window = (way_winType) data;
   xdg_surface_ack_configure(surface, serial); // Library function, acknowledges configuration (Wayland Book 7.1)
-  printf("Configure xdg: %d x %d    %d x %d\n", window->width, window->height, window->pendingWidth, window->pendingHeight);
+  // printf("Configure xdg: %d x %d    %d x %d\n", window->width, window->height, window->pendingWidth, window->pendingHeight);
 
   if
   ( window->pendingWidth > 0 && window->pendingWidth != window->width ||

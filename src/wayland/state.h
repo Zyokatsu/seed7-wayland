@@ -71,7 +71,6 @@ struct ClientState
 };
 
 extern struct ClientState waylandState;
-extern const bool AlphaEnabled;
 
 void alter_key_state (struct ClientState *state, uint32_t key, bool pressed);
 void alter_mouse_button_state (struct ClientState *state, uint32_t button, bool pressed);

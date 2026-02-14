@@ -1,6 +1,33 @@
-/*#define LOG_FUNCTIONS 0
-#define VERBOSE_EXCEPTIONS 0*/
-// To do: gkbWindow needs to be implemented, and special key-combinations are not being triggered.
+/********************************************************************/
+/*                                                                  */
+/*  gkb_way.c     Keyboard and mouse access for Wayland.            */
+/*  Copyright (C) 2026  Thomas Mertes                               */
+/*                                                                  */
+/*  This file is part of the Seed7 Runtime Library.                 */
+/*                                                                  */
+/*  The Seed7 Runtime Library is free software; you can             */
+/*  redistribute it and/or modify it under the terms of the GNU     */
+/*  Lesser General Public License as published by the Free Software */
+/*  Foundation; either version 2.1 of the License, or (at your      */
+/*  option) any later version.                                      */
+/*                                                                  */
+/*  The Seed7 Runtime Library is distributed in the hope that it    */
+/*  will be useful, but WITHOUT ANY WARRANTY; without even the      */
+/*  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR */
+/*  PURPOSE.  See the GNU Lesser General Public License for more    */
+/*  details.                                                        */
+/*                                                                  */
+/*  You should have received a copy of the GNU Lesser General       */
+/*  Public License along with this program; if not, write to the    */
+/*  Free Software Foundation, Inc., 51 Franklin Street,             */
+/*  Fifth Floor, Boston, MA  02110-1301, USA.                       */
+/*                                                                  */
+/*  Module: Seed7 Runtime Library                                   */
+/*  File: seed7/src/wayland/gkb_way.c                               */
+/*  Content: Keyboard and mouse access for Wayland.                 */
+/*                                                                  */
+/********************************************************************/
+// To do: gkbWindow needs to be implemented, and lock-on key states are not recorded/reported.
 
 #include "../version.h"
 
@@ -59,7 +86,6 @@ void wait_for_key ()
 }
 
 // Translate special key-codes from X11 to Seed7.
-// Currently skipping useless combo-keys (shift-up, etc.), as they can be determined by checking the pressed keys.
 uint32_t translate_key (uint32_t key)
 {
   switch (key)
@@ -162,9 +188,7 @@ void add_pressed_key (struct ClientState *state, uint32_t key)
       state->keysPressed = newPressed;
     }
     else
-    { puts("Failed to allocate the initial keys-pressed block.");
-      exit(1);
-    }
+      raise_error(MEMORY_ERROR);
   }
   else
   if (state->keysPressed->use >= state->keysPressed->size)
@@ -182,9 +206,7 @@ void add_pressed_key (struct ClientState *state, uint32_t key)
       state->keysPressed = newPressed;
     }
     else
-    { puts("Failed to allocate the new keys-pressed block.");
-      exit(1);
-    }
+      raise_error(MEMORY_ERROR);
   }
   else
   { state->keysPressed->content[state->keysPressed->use] = key;
@@ -216,9 +238,7 @@ void remove_pressed_key (struct ClientState *state, uint32_t key)
             state->keysPressed = newPressed;
           }
           else
-          { puts("Failed to allocate the reduced keys-pressed block.");
-            exit(1);
-          }
+            raise_error(MEMORY_ERROR);
         }
         else // Or continue to use the buffer.
         { for (int unsigned y = x; y < state->keysPressed->use - 1; y++)
@@ -246,8 +266,8 @@ void expand_key_history (struct ClientState *state, uint32_t key)
         state->keyHistory->keys = 0;
       }
       else
-      { puts("Failed to allocate the initial key history block.");
-        exit(1);
+      { raise_error(MEMORY_ERROR);
+        return;
       }
     }
 
@@ -274,9 +294,7 @@ void expand_key_history (struct ClientState *state, uint32_t key)
         state->keyHistory->keys = newKeys;
       }
       else
-      { puts("Failed to allocate key history's initial key block.");
-        exit(1);
-      }
+        raise_error(MEMORY_ERROR);
     }
     else
     if (KeySpan == KeyLimit)
@@ -315,6 +333,48 @@ void alter_switch_state (struct ClientState *state, uint32_t key, bool pressed)
   }
 }
 
+boolType alt_pressed (struct ClientState *state)
+{
+  if (state->keysPressed && state->keysPressed->use > 0)
+  { for (int unsigned x = 0; x < state->keysPressed->use; x++)
+      if
+      ( state->keysPressed->content[x] == K_ALT ||
+        state->keysPressed->content[x] == K_LEFT_ALT ||
+        state->keysPressed->content[x] == K_RIGHT_ALT
+      )
+        return TRUE;
+  }
+  return FALSE;
+}
+
+boolType control_pressed (struct ClientState *state)
+{
+  if (state->keysPressed && state->keysPressed->use > 0)
+  { for (int unsigned x = 0; x < state->keysPressed->use; x++)
+      if
+      ( state->keysPressed->content[x] == K_CONTROL ||
+        state->keysPressed->content[x] == K_LEFT_CONTROL ||
+        state->keysPressed->content[x] == K_RIGHT_CONTROL
+      )
+        return TRUE;
+  }
+  return FALSE;
+}
+
+boolType shift_pressed (struct ClientState *state)
+{
+  if (state->keysPressed && state->keysPressed->use > 0)
+  { for (int unsigned x = 0; x < state->keysPressed->use; x++)
+      if
+      ( state->keysPressed->content[x] == K_SHIFT ||
+        state->keysPressed->content[x] == K_LEFT_SHIFT ||
+        state->keysPressed->content[x] == K_RIGHT_SHIFT
+      )
+        return TRUE;
+  }
+  return FALSE;
+}
+
 // Called by the Wayland key event hook (for presses and releases).
 void alter_key_state (struct ClientState *state, uint32_t key, bool pressed)
 {
@@ -344,13 +404,148 @@ void gkbInitKeyboard (void)
   waylandState.mousePoint.y = 0;
 }
 
-// Unfinished.
+// Unfinished: doesn't yet handle shift/num/scroll lock on.
 boolType gkbButtonPressed (charType button)
 {
+  charType target = button;
+  int shift = 0, control = 0, alt = 0;
+  boolType targetFound = FALSE;
+
+  // Shift types.
+  if (target == K_SHIFT)
+  { targetFound = TRUE;
+    shift = -1;
+  }
+  if (target >= K_SFT_F1 && target <= K_SFT_F12)
+  { target = K_F1 + target - K_SFT_F1;
+    shift = -1;
+  }
+  else
+  if (target >= K_SFT_LEFT && target <= K_SFT_PAD_CENTER)
+  { target = K_LEFT + target - K_SFT_LEFT;
+    shift = -1;
+  }
+  else
+  if (target >= K_SFT_MOUSE1 && target <= K_SFT_MOUSE_BACK)
+  { target = K_MOUSE1 + target - K_SFT_MOUSE1;
+    shift = -1;
+  }
+  else // Control types.
+  if (target == K_CONTROL)
+  { targetFound = TRUE;
+    control = -1;
+  }
+  else
+  if (target >= K_CTL_A && target <= K_CTL_Z)
+  { target = 'a' + target - K_CTL_A;
+    control = -1;
+  }
+  else
+  if (target >= K_CTL_0 && target <= K_CTL_9)
+  { target = '0' + target - K_CTL_0;
+    control = -1;
+  }
+  else
+  if (target >= K_CTL_F1 && target <= K_CTL_F12)
+  { target = K_F1 + target - K_CTL_F1;
+    control = -1;
+  }
+  else
+  if (target >= K_CTL_LEFT && target <= K_CTL_PAD_CENTER)
+  { target = K_LEFT + target - K_CTL_LEFT;
+    control = -1;
+  }
+  else
+  if (target >= K_CTL_MOUSE1 && target <= K_CTL_MOUSE_BACK)
+  { target = K_MOUSE1 + target - K_CTL_MOUSE1;
+    control = -1;
+  }
+  else // Alt types.
+  if (target == K_ALT)
+  { targetFound = TRUE;
+    alt = -1;
+  }
+  else
+  if (target >= K_ALT_A && target <= K_ALT_Z)
+  { target = 'a' + target - K_ALT_A;
+    alt = -1;
+  }
+  else
+  if (target >= K_ALT_0 && target <= K_ALT_9)
+  { target = '0' + target - K_ALT_0;
+    alt = -1;
+  }
+  else
+  if (target >= K_ALT_F1 && target <= K_ALT_F12)
+  { target = K_F1 + target - K_ALT_F1;
+    alt = -1;
+  }
+  else
+  if (target >= K_ALT_LEFT && target <= K_ALT_PAD_CENTER)
+  { target = K_LEFT + target - K_ALT_LEFT;
+    alt = -1;
+  }
+  else
+  if (target >= K_ALT_MOUSE1 && target <= K_ALT_MOUSE_BACK)
+  { target = K_MOUSE1 + target - K_ALT_MOUSE1;
+    alt = -1;
+  }
+  else
+    switch (target)
+    { case K_SFT_NL: target = K_NL; shift = -1; break;
+      case K_SFT_BS: target = K_BS; shift = -1; break;
+      case K_SFT_TAB: target = K_TAB; shift = -1; break;
+      case K_SFT_ESC: target = K_ESC; shift = -1; break;
+      case K_SFT_MENU: target = K_MENU; shift = -1; break;
+      case K_SFT_PRINT: target = K_PRINT; shift = -1; break;
+      case K_SFT_PAUSE: target = K_PAUSE; shift = -1; break;
+      case K_CTL_NL: target = K_NL; control = -1; break;
+      case K_CTL_BS: target = K_BS; control = -1; break;
+      case K_CTL_TAB: target = K_TAB; control = -1; break;
+      case K_CTL_ESC: target = K_ESC; control = -1; break;
+      case K_CTL_MENU: target = K_MENU; control = -1; break;
+      case K_CTL_PRINT: target = K_PRINT; control = -1; break;
+      case K_CTL_PAUSE: target = K_PAUSE; control = -1; break;
+      case K_ALT_NL: target = K_NL; alt = -1; break;
+      case K_ALT_BS: target = K_BS; alt = -1; break;
+      case K_ALT_TAB: target = K_TAB; alt = -1; break;
+      case K_ALT_ESC: target = K_ESC; alt = -1; break;
+      case K_ALT_MENU: target = K_MENU; alt = -1; break;
+      case K_ALT_PRINT: target = K_PRINT; alt = -1; break;
+      case K_ALT_PAUSE: target = K_PAUSE; alt = -1; break;
+    }
+
   if (waylandState.keysPressed && waylandState.keysPressed->use > 0)
-  { for (int unsigned x = 0; x < waylandState.keysPressed->use; x++)
-      if (waylandState.keysPressed->content[x] == button)
+  { uint32_t *key = waylandState.keysPressed->content;
+    for (int unsigned x = 0; x < waylandState.keysPressed->use; x++, key++)
+    { // These three keys share the same codes as CTL_H, CTL_I, and CTL_J (which would have been converted above).
+      if (*key == button && (button == K_BS || button == K_TAB || button == K_NL))
+        return true;
+      else
+      if (*key == target)
+        targetFound = TRUE;
+      else
+      { switch (*key)
+        { case K_LEFT_SHIFT:
+          case K_RIGHT_SHIFT:
+            shift = 1;
+            break;
+          case K_LEFT_CONTROL:
+          case K_RIGHT_CONTROL:
+            control = 1;
+            break;
+          case K_LEFT_ALT:
+          case K_RIGHT_ALT:
+            alt = 1;
+            break;
+          default:
+            if ((control || alt) && target >= 'a' && target <= 'z' && *key >= 'A' && *key <= 'Z' && *key - 'A' == target - 'a')
+              targetFound = TRUE;
+        }
+      }
+      if (targetFound && shift >= 0 && control >= 0 && alt >= 0)
         return TRUE;
+    }
   }
 
   return FALSE;
@@ -366,43 +561,126 @@ intType gkbClickedYpos (void)
   return (intType) waylandState.mousePoint.y;
 }
 
-// Unfinished.
+// Reads a character as would be seen when typed into a terminal.
 charType gkbGetc (void)
 {
   charType result = K_NONE;
+  boolType getNextChar = FALSE;
+  int unsigned newSize;
 
-  if (!key_history_populated())
-    wait_for_key();
+  do
+  { if (!key_history_populated())
+      wait_for_key();
 
-  result = waylandState.keyHistory->keys->content[0];
+    result = waylandState.keyHistory->keys->content[0];
+    // Skip over control characters.
+    if (result >= K_SHIFT && result <= K_SCROLL_LOCK)
+      getNextChar = TRUE;
+    else
+    { getNextChar = FALSE;
+      // Special Shift/Control/Alt combos.
+      if (shift_pressed(&waylandState))
+      { if (result >= K_F1 && result <= K_F12)
+          result = K_ALT_F1 + result - K_F1;
+        else
+        if (result >= K_LEFT && result <= K_PAD_CENTER)
+          result = K_ALT_LEFT + result - K_LEFT;
+        else
+          switch (result)
+          { case K_NL: result = K_SFT_NL; break;
+            case K_BS: result = K_SFT_BS; break;
+            case K_TAB: result = K_SFT_TAB; break;
+            case K_ESC: result = K_ALT_ESC; break;
+            case K_MENU: result = K_ALT_MENU; break;
+            case K_PRINT: result = K_ALT_PRINT; break;
+            case K_PAUSE: result = K_ALT_PAUSE; break;
+          }
+      }
+      else
+      if (control_pressed(&waylandState))
+      { if (result >= 'a' && result <= 'z')
+          result = K_CTL_A + result - 'a';
+        else
+        if (result >= 'A' && result <= 'Z')
+          result = K_CTL_A + result - 'A';
+        else
+        if (result >= '0' && result <= '9')
+          result = K_CTL_0 + result - '0';
+        else
+        if (result >= K_F1 && result <= K_F12)
+          result = K_CTL_F1 + result - K_F1;
+        else
+        if (result >= K_LEFT && result <= K_PAD_CENTER)
+          result = K_CTL_LEFT + result - K_LEFT;
+        else
+          switch (result)
+          { case K_NL: result = K_CTL_NL; break;
+            case K_BS: result = K_CTL_BS; break;
+            case K_TAB: result = K_CTL_TAB; break;
+            case K_ESC: result = K_CTL_ESC; break;
+            case K_MENU: result = K_CTL_MENU; break;
+            case K_PRINT: result = K_CTL_PRINT; break;
+            case K_PAUSE: result = K_CTL_PAUSE; break;
+          }
+      }
+      else
+      if (alt_pressed(&waylandState))
+      { if (result >= 'a' && result <= 'z')
+          result = K_ALT_A + result - 'a';
+        else
+        if (result >= 'A' && result <= 'Z')
+          result = K_ALT_A + result - 'A';
+        else
+        if (result >= '0' && result <= '9')
+          result = K_ALT_0 + result - '0';
+        else
+        if (result >= K_F1 && result <= K_F12)
+          result = K_ALT_F1 + result - K_F1;
+        else
+        if (result >= K_LEFT && result <= K_PAD_CENTER)
+          result = K_ALT_LEFT + result - K_LEFT;
+        else
+          switch (result)
+          { case K_NL: result = K_ALT_NL; break;
+            case K_BS: result = K_ALT_BS; break;
+            case K_TAB: result = K_ALT_TAB; break;
+            case K_ESC: result = K_ALT_ESC; break;
+            case K_MENU: result = K_ALT_MENU; break;
+            case K_PRINT: result = K_ALT_PRINT; break;
+            case K_PAUSE: result = K_ALT_PAUSE; break;
+          }
+      }
+    }
 
-  // Remove the key from the history (reallocating at buffer size or every 10 characters beyond it).
-  if
-  ( waylandState.keyHistory->keys->use == KeyBuffer + 1 ||
-    waylandState.keyHistory->keys->use > KeyBuffer && (waylandState.keyHistory->keys->use-KeyBuffer) % 10 == 0
-  )
-  { struct KeyArray *newKeys = malloc(sizeof *waylandState.keyHistory->keys + sizeof *waylandState.keyHistory->keys->content * KeyBuffer);
+    // Remove the key from the history (reallocating at buffer size or every 10 characters beyond it).
+    if
+    ( waylandState.keyHistory->keys->use == KeyBuffer + 1 ||
+      waylandState.keyHistory->keys->use > KeyBuffer && (waylandState.keyHistory->keys->use-KeyBuffer) % 10 == 0
+    )
+    { newSize = (waylandState.keyHistory->keys->use == KeyBuffer + 1) ? KeyBuffer : waylandState.keyHistory->keys->use;
+      struct KeyArray *newKeys = malloc(sizeof *waylandState.keyHistory->keys + sizeof *waylandState.keyHistory->keys->content * newSize);
 
-    if (newKeys)
-    { newKeys->size = KeyBuffer;
-      newKeys->use = KeyBuffer;
+      if (newKeys)
+      { newKeys->size = newSize;
+        newKeys->use = (newSize == waylandState.keyHistory->keys->use) ? newSize-1 : newSize;
 
-      for (int unsigned x = 0; x < newKeys->size; x++)
-        newKeys->content[x] = waylandState.keyHistory->keys->content[x+1];
+        for (int unsigned x = 0; x < newKeys->use; x++)
+          newKeys->content[x] = waylandState.keyHistory->keys->content[x+1];
 
-      free(waylandState.keyHistory->keys);
-      waylandState.keyHistory->keys = newKeys;
+        free(waylandState.keyHistory->keys);
+        waylandState.keyHistory->keys = newKeys;
+      }
+      else
+      { // puts("Failed to allocate key history's reduced key block.");
+        raise_error(MEMORY_ERROR);
+      }
     }
     else
-    { // puts("Failed to allocate key history's reduced key block.");
-      raise_error(MEMORY_ERROR);
+    { for (int unsigned x = 0; x < waylandState.keyHistory->keys->use - 1; x++)
+        waylandState.keyHistory->keys->content[x] = waylandState.keyHistory->keys->content[x+1];
+      waylandState.keyHistory->keys->use--;
     }
-  }
-  else
-  { for (int unsigned x = 0; x < waylandState.keyHistory->keys->use - 1; x++)
-      waylandState.keyHistory->keys->content[x] = waylandState.keyHistory->keys->content[x+1];
-    waylandState.keyHistory->keys->use--;
-  }
+  } while (getNextChar);
 
   return result;
 }
