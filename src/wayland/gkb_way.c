@@ -174,6 +174,43 @@ uint32_t translate_mouse_button (uint32_t button)
   }
 }
 
+// Drops all non-mouse keys.
+void reset_pressed_keys (struct ClientState *state)
+{
+  if (state && state->keysPressed && state->keysPressed->use > 0)
+  { int newUse = state->keysPressed->use;
+    for (int unsigned x = 0; x < state->keysPressed->use;)
+      if (state->keysPressed->content[x] < K_MOUSE1 || state->keysPressed->content[x] > K_MOUSE_BACK)
+      { newUse--;
+        if (x + 1 < state->keysPressed->use)
+          state->keysPressed->content[x] = state->keysPressed->content[x+1];
+        else
+          break;
+      }
+      else
+        x++;
+    state->keysPressed->use = newUse;
+  }
+}
+
+void reset_pressed_mouse_buttons (struct ClientState *state)
+{
+  if (state && state->keysPressed && state->keysPressed->use > 0)
+  { int newUse = state->keysPressed->use;
+    for (int unsigned x = 0; x < state->keysPressed->use;)
+      if (state->keysPressed->content[x] >= K_MOUSE1 && state->keysPressed->content[x] <= K_MOUSE_BACK)
+      { newUse--;
+        if (x + 1 < state->keysPressed->use)
+          state->keysPressed->content[x] = state->keysPressed->content[x+1];
+        else
+          break;
+      }
+      else
+        x++;
+    state->keysPressed->use = newUse;
+  }
+}
+
 // Populates the keys-pressed array.
 void add_pressed_key (struct ClientState *state, uint32_t key)
 {
@@ -313,7 +350,7 @@ void expand_key_history (struct ClientState *state, uint32_t key)
 }
 
 // Used for buttons and keys, the key parameter should be the Seed7 value (post-translation).
-void alter_switch_state (struct ClientState *state, uint32_t key, bool pressed)
+void alter_switch_state (struct ClientState *state, uint32_t key, bool pressed, bool touchHistory)
 {
   /*printf
   ( "Alter key state called.\n"
@@ -326,7 +363,8 @@ void alter_switch_state (struct ClientState *state, uint32_t key, bool pressed)
   if (state)
   { if (pressed)
     { add_pressed_key(state, key);
-      expand_key_history(state, key);
+      if (touchHistory)
+        expand_key_history(state, key);
     }
     else
       remove_pressed_key(state, key);
@@ -376,14 +414,14 @@ boolType shift_pressed (struct ClientState *state)
 }
 
 // Called by the Wayland key event hook (for presses and releases).
-void alter_key_state (struct ClientState *state, uint32_t key, bool pressed)
+void alter_key_state (struct ClientState *state, uint32_t key, bool pressed, bool touchHistory)
 {
-  alter_switch_state(state, translate_key(key), pressed);
+  alter_switch_state(state, translate_key(key), pressed, touchHistory);
 }
 
-void alter_mouse_button_state (struct ClientState *state, uint32_t button, bool pressed)
+void alter_mouse_button_state (struct ClientState *state, uint32_t button, bool pressed, bool touchHistory)
 {
-  alter_switch_state(state, translate_mouse_button(button), pressed);
+  alter_switch_state(state, translate_mouse_button(button), pressed, touchHistory);
 }
 
 void record_mouse_movement (struct ClientState *state, int x, int y)
@@ -573,6 +611,7 @@ charType gkbGetc (void)
       wait_for_key();
 
     result = waylandState.keyHistory->keys->content[0];
+
     // Skip over control characters.
     if (result >= K_SHIFT && result <= K_SCROLL_LOCK)
       getNextChar = TRUE;

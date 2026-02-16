@@ -1015,11 +1015,13 @@ winType drwGetPixmap
       { dPos = dy*pixmap->width;
         for (dx = 0; dx < pixmap->width; dx++)
           if
-          ( left+dx >= 0 && left+dx < source->width &&
-            upper+dy >= 0 && upper+dy < source->height
+          ( dx >= x &&
+            dy >= y &&
+            left+dx-x >= 0 && left+dx-x < source->width &&
+            upper+dy-y >= 0 && upper+dy-y < source->height
           )
-          { sPos = (upper+dy)*source->width + left;
-            pixmap->buffer->content[dPos+dx] = source->buffer->content[sPos+dx];
+          { sPos = (upper+dy-y)*source->width + left;
+            pixmap->buffer->content[dPos+dx] = source->buffer->content[sPos+dx-x];
           }
           else
             pixmap->buffer->content[dPos+dx] = 0xFF000000; // Black.
@@ -2156,7 +2158,7 @@ void drwPut (const_winType destWindow, intType xDest, intType yDest, const_winTy
   }
 }
 
-// Unfinished.
+// Unfinished. Needs downscaling.
 void drwPutScaled
 ( const_winType destWindow,
   intType xDest,
@@ -2165,7 +2167,96 @@ void drwPutScaled
   intType height,
   const_winType pixmap
 )
-{}
+{
+  way_winType source, destination;
+
+  logFunction(printf("drwPutScaled(" FMT_U_MEM  ", " FMT_D ", " FMT_D
+                     ", " FMT_D ", " FMT_D ", " FMT_U_MEM")\n",
+                     (memSizeType) destWindow, xDest, yDest,
+                     width, height, (memSizeType) pixmap););
+  if (unlikely(!inIntRange(xDest) || !inIntRange(yDest) || width < 0 || width > UINT_MAX || height < 0 || height > UINT_MAX))
+  { logError(printf("drwPutScaled(" FMT_U_MEM  ", " FMT_D ", " FMT_D
+                    ", " FMT_D ", " FMT_D ", " FMT_U_MEM"): "
+                    "Raises RANGE_ERROR\n",
+                    (memSizeType) destWindow, xDest, yDest,
+                    width, height, (memSizeType) pixmap););
+    raise_error(RANGE_ERROR);
+  }
+  else if (destWindow && pixmap)
+  { source = (way_winType) pixmap;
+    destination = (way_winType) destWindow;
+    if (prepare_buffer_copy(&waylandState, destination))
+    { // No scaling = same as drwPut
+      if (width == source->width && height == source->height)
+      { for (int y = 0; y < source->buffer->height && y+yDest < destination->height; y++)
+          for (int x = 0; x < source->buffer->width && x+xDest < destination->width; x++)
+          { int pos = y * source->buffer->width + x;
+            int dx = xDest + x,
+                dy = yDest + y,
+                dpos = dy * destination->buffer->width + dx;
+            destination->buffer->content[dpos] = source->buffer->content[pos];
+          }
+      }
+      else // Upscaling (variant of nearest neighbour).
+      if (width >= source->width && height >= source->height)
+      { // Calculate x/y span, and place the remainder into the "delay".
+        float xScale = (float)width / (float)source->buffer->width,
+              yScale = (float)height / (float)source->buffer->height;
+        int xSpan = trunc(xScale),
+            ySpan = trunc(yScale);
+        float xDelayRate = xScale - (float)xSpan,
+              yDelayRate = yScale - (float)ySpan;
+        int xDelay = -1, yDelay = -1;
+        if (xDelayRate > 0.00001)
+          xDelay = 1.0 / xDelayRate;
+        if (yDelay > 0.00001)
+          yDelay = 1.0 / yDelayRate;
+        // printf("xScale: %f  span: %d  delay: %d\n", xScale, xSpan, xDelay);
+        for (int y = 0, dy = 0, yStep=0; y < source->buffer->height && yDest+dy < destination->height; y++)
+        { // If the delay has been fulfilled, up the span for this loop.
+          if (yStep == yDelay-1)
+            ySpan++;
+          for (int dySpan = 0; dySpan < ySpan && yDest+dy+dySpan < destination->height; dySpan++)
+          { int pos = y * source->buffer->width,
+                dpos = (yDest+dy) * destination->buffer->width + xDest;
+            for (int x=0, dx=0, xStep=0; x < source->buffer->width && xDest+dx < destination->width; x++, pos++)
+            { if (xStep == xDelay-1)
+                xSpan++;
+              for (int dxSpan = 0; dxSpan < xSpan && xDest+dx < destination->width; dxSpan++)
+              { destination->buffer->content[dpos+dx] = source->buffer->content[pos];
+                dx++;
+              }
+              // Reset the x-span, or else increase the step.
+              if (xStep == xDelay-1)
+              { xSpan--;
+                xStep = 0;
+              }
+              else
+                xStep++;
+            }
+            dy++;
+          }
+          // Reset the y-span, or else increase the step.
+          if (yStep == yDelay-1)
+          { ySpan--;
+            yStep = 0;
+          }
+          else
+            yStep++;
+        }
+      }
+
+      // If the destination is a Wayland window, send the data.
+      if (!destination->isPixmap)
+      { wl_buffer_add_listener(destination->buffer->waylandData, &waylandBufferListener, NULL); // Add listener to destroy buffer.
+        wl_surface_attach(destination->surface, destination->buffer->waylandData, 0, 0);
+        wl_surface_damage_buffer(destination->surface, xDest, yDest, source->buffer->width, source->buffer->height); // Damage the affected area (as only that section needs updating).
+        wl_surface_commit(destination->surface);
+        // wl_display_dispatch(waylandState.display);
+      }
+    }
+  }
+}
 
 /* Controls the internal processing of colours (looks like it's filling alpha with 0xff).
 Code Copied from drw_emc.c */

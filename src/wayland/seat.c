@@ -89,6 +89,7 @@ void wl_pointer_enter
   state->pointerEvent.serial = serial;
   state->pointerEvent.surfaceX = localX,
   state->pointerEvent.surfaceY = localY;
+  reset_pressed_mouse_buttons(state);
 
   if (state->hidePointer)
     wl_pointer_set_cursor(wl_pointer, serial, 0, 0, 0);
@@ -188,7 +189,7 @@ void wl_pointer_frame(void *data, struct wl_pointer *wl_pointer)
   if (event->eventMask & POINTER_EVENT_BUTTON)
   { /*char *state = event->state == WL_POINTER_BUTTON_STATE_RELEASED ? "released" : "pressed";
     printf("button %d %s ", event->button, state);*/
-    alter_mouse_button_state(clientState, event->button, event->state != WL_POINTER_BUTTON_STATE_RELEASED);
+    alter_mouse_button_state(clientState, event->button, event->state != WL_POINTER_BUTTON_STATE_RELEASED, true);
   }
 
   uint32_t axis_events = POINTER_EVENT_AXIS
@@ -275,6 +276,7 @@ void wl_keyboard_enter
   struct ClientState *clientState = data;
   // fprintf(stderr, "keyboard enter; keys pressed are:\n");
   uint32_t *key;
+  reset_pressed_keys(clientState);
 
   // evdev scancodes need +8 to convert to XKB scancode (hence "*key + 8" below).
   wl_array_for_each(key, keys)
@@ -284,7 +286,7 @@ void wl_keyboard_enter
     // fprintf(stderr, "sym: %-12s (%d), ", buf, sym);
     // xkb_state_key_get_utf8(clientState->xkbState, *key + 8, buf, sizeof(buf));
     // fprintf(stderr, "utf8: '%s'\n", buf);
-    alter_key_state(clientState, sym, true);
+    alter_key_state(clientState, sym, true, false);
   }
 }
 
@@ -301,7 +303,7 @@ void wl_keyboard_key (void *data, struct wl_keyboard *wl_keyboard, uint32_t seri
   // fprintf(stderr, "utf8: '%s'\n", buf);
 
   // Function located in gkb_way.c
-  alter_key_state(clientState, sym, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+  alter_key_state(clientState, sym, state == WL_KEYBOARD_KEY_STATE_PRESSED, true);
 }
 
 // Called when the surface loses keyboard focus.

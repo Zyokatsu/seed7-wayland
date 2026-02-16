@@ -72,8 +72,10 @@ struct ClientState
 
 extern struct ClientState waylandState;
 
-void alter_key_state (struct ClientState *state, uint32_t key, bool pressed);
-void alter_mouse_button_state (struct ClientState *state, uint32_t button, bool pressed);
+void alter_key_state (struct ClientState *state, uint32_t key, bool pressed, bool touchHistory);
+void alter_mouse_button_state (struct ClientState *state, uint32_t button, bool pressed, bool touchHistory);
 void record_mouse_movement (struct ClientState *state, int x, int y);
+void reset_pressed_keys (struct ClientState *state);
+void reset_pressed_mouse_buttons (struct ClientState *state);
 void trigger_mouse_scroll (struct ClientState *state, bool forward);
 #endif
