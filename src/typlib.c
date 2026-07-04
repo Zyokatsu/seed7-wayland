@@ -327,22 +327,6 @@ objectType typ_interfaces (listType arguments)
 
 
 
-objectType typ_isdeclared (listType arguments)
-
-  {
-    objectType result;
-
-  /* typ_isdeclared */
-    if (CATEGORY_OF_OBJ(arg_1(arguments)) == DECLAREDOBJECT) {
-      result = SYS_TRUE_OBJECT;
-    } else {
-      result = SYS_FALSE_OBJECT;
-    } /* if */
-    return result;
-  } /* typ_isdeclared */
-
-
-
 objectType typ_isderived (listType arguments)
 
   {
@@ -359,22 +343,6 @@ objectType typ_isderived (listType arguments)
     } /* if */
     return result;
   } /* typ_isderived */
-
-
-
-objectType typ_isforward (listType arguments)
-
-  {
-    objectType result;
-
-  /* typ_isforward */
-    if (CATEGORY_OF_OBJ(arg_1(arguments)) == FORWARDOBJECT) {
-      result = SYS_TRUE_OBJECT;
-    } else {
-      result = SYS_FALSE_OBJECT;
-    } /* if */
-    return result;
-  } /* typ_isforward */
 
 
 
@@ -542,6 +510,23 @@ objectType typ_str (listType arguments)
 
 
 
+objectType typ_typeof (listType arguments)
+
+  {
+    objectType anObject;
+
+  /* typ_typeof */
+    anObject = arg_1(arguments);
+    logFunction(printf("typ_typeof(");
+                trace1(anObject);
+                printf(") --> ");
+                printtype(anObject->type_of);
+                printf("\n"););
+    return bld_type_temp(anObject->type_of);
+  } /* typ_typeof */
+
+
+
 /**
  *  Get 'type' value of the object referenced by 'aReference/arg_1'.
  *  @return the 'type' value of the referenced object.
@@ -557,10 +542,11 @@ objectType typ_value (listType arguments)
     isit_reference(arg_1(arguments));
     aReference = take_reference(arg_1(arguments));
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != TYPEOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != TYPEOBJECT ||
+                 take_type(aReference) == NULL)) {
       logError(printf("typ_value(");
                trace1(aReference);
-               printf("): Category is not TYPEOBJECT.\n"););
+               printf("): Not a legal TYPEOBJECT.\n"););
       return raise_exception(SYS_RNG_EXCEPTION);
     } else {
       return aReference;

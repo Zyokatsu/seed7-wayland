@@ -62,7 +62,7 @@ var reference: currentProfiledFunction is NIL;
 const proc: prc_prototypes (inout file: c_prog) is func
 
   begin
-    declareExtern(c_prog, "genericType hshIdxDefault0 (const const_hashType, const genericType, intType, compareType);");
+    declareExtern(c_prog, "rtlValueUnion hshIdxDefault0 (const const_hashType, const rtlValueUnion, intType, compareFuncType);");
     declareExtern(c_prog, "void        heapStatistic (void);");
     declareExtern(c_prog, "void        prcGetRunError (intType *, striType *, intType *);");
     if ccConf.HAS_VECTORED_EXCEPTION_HANDLER then
@@ -802,6 +802,11 @@ const proc: generate_switch (in reference: controlExpr,
       c_expr.expr &:= "(scharType)(";
       process_expr(controlExpr, c_expr);
       c_expr.expr &:= ")";
+    elsif controlExprType in typeData.typeCategory and
+        typeData.typeCategory[controlExprType] = ACTENTRYOBJECT then
+      c_expr.expr &:= "aceOrd(";
+      process_expr(controlExpr, c_expr);
+      c_expr.expr &:= ")";
     elsif ccConf.SWITCH_WORKS_FOR_INT64TYPE then
       process_expr(controlExpr, c_expr);
     else
@@ -846,7 +851,6 @@ const type: allCaseTablesType is array caseTableType;
 var allCaseTablesType: case_table is [0 .. -1] times 0 times NIL;
 
 
-const proc: process_hashcode (in reference: current_object, inout expr_type: c_expr) is forward;
 const proc: object_address (in reference: current_object, inout expr_type: c_expr) is forward;
 
 
@@ -862,6 +866,107 @@ const func reference: compareObj (in reference: current_object) is func
     param_list &:= make_list(syobject(prog, "compare"));
     keyCompare := matchExpr(prog, param_list);
     keyCompare := getValue(keyCompare, ref_list)[1];
+  end func;
+
+
+const func reference: hashCodeObj (in reference: current_object) is func
+
+  result
+    var reference: hashCode is NIL;
+  local
+    var ref_list: param_list is ref_list.EMPTY;
+  begin
+    param_list := make_list(current_object);
+    param_list &:= make_list(syobject(prog, "hashCode"));
+    hashCode := matchExpr(prog, param_list);
+    hashCode := getValue(hashCode, ref_list)[1];
+  end func;
+
+
+const proc: process_hashcode (in type: variableType,
+    in string: variableName, in reference: param1,
+    inout expr_type: c_expr) is func
+  local
+    var string: temp_name is "";
+  begin
+    if variableType in typeData.typeCategory then
+      case typeData.typeCategory[variableType] of
+        when {BOOLOBJECT, ENUMOBJECT}:
+          c_expr.expr &:= "(intType)(";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= ")";
+        when {INTOBJECT}:
+          c_expr.expr &:= variableName;
+        when {CHAROBJECT}:
+          c_expr.expr &:= "(intType)((scharType)(";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= "))";
+        when {FLOATOBJECT}:
+          temp_name := defineTempVariable("rtlValueUnion", "tmp_", c_expr);
+          c_expr.expr &:= "(";
+          c_expr.expr &:= temp_name;
+          c_expr.expr &:= ".floatValue=";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= ",";
+          c_expr.expr &:= temp_name;
+          c_expr.expr &:= ".intValue)";
+        when {REFOBJECT, STRUCTELEMOBJECT, INTERFACEOBJECT, TYPEOBJECT,
+              WINOBJECT, PROGOBJECT}:
+          c_expr.expr &:= "(intType)(((memSizeType)(";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= ")) >> 6)";
+        when {BIGINTOBJECT}:
+          c_expr.expr &:= "bigHashCode(";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= ")";
+        when {STRIOBJECT}:
+          if config.inlineFunctions then
+            c_expr.expr &:= "(";
+            c_expr.expr &:= variableName;
+            c_expr.expr &:= "->size==0 ? 0 : (";
+            c_expr.expr &:= variableName;
+            c_expr.expr &:= "->mem[0]<<5 ^ ";
+            c_expr.expr &:= variableName;
+            c_expr.expr &:= "->mem[";
+            c_expr.expr &:= variableName;
+            c_expr.expr &:= "->size>>1]<<3 ^ ";
+            c_expr.expr &:= variableName;
+            c_expr.expr &:= "->mem[";
+            c_expr.expr &:= variableName;
+            c_expr.expr &:= "->size-1]<<1 ^ ";
+            c_expr.expr &:= variableName;
+            c_expr.expr &:= "->size))";
+          else
+            c_expr.expr &:= "strHashCode(";
+            c_expr.expr &:= variableName;
+            c_expr.expr &:= ")";
+          end if;
+        when {BSTRIOBJECT, POINTLISTOBJECT}:
+          c_expr.expr &:= "bstHashCode(";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= ")";
+        when {SETOBJECT}:
+          c_expr.expr &:= "setHashCode(";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= ")";
+        when {PROCESSOBJECT}:
+          c_expr.expr &:= "pcsHashCode(";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= ")";
+        otherwise:
+          c_expr.expr &:= "o_";
+          c_expr.expr &:= str(objNumber(hashCodeObj(param1)));
+          c_expr.expr &:= "_hashCode(";
+          c_expr.expr &:= variableName;
+          c_expr.expr &:= ")";
+      end case;
+    else
+      c_expr.expr &:= "o_";
+      c_expr.expr &:= str(objNumber(hashCodeObj(param1)));
+      c_expr.expr &:= "_hashCode(";
+      c_expr.expr &:= variableName;
+      c_expr.expr &:= ")";
+    end if;
   end func;
 
 
@@ -913,12 +1018,15 @@ const proc: process (PRC_CASE_HASHSET, in reference: function,
 
   local
     var integer: numOfCaseStmt is 0;
-    var reference: switchValue is NIL;
+    var type: caseExprType is void;
+    var string: variableName is "";
     var expr_type: statement is expr_type.value;
   begin
     case_table &:= 0 times NIL;
     numOfCaseStmt := maxIdx(case_table);
-    switchValue := getParameterAsVariable(params[2], statement);
+    caseExprType := getExprResultType(params[2]);
+    variableName := defineParameterAsVariable(
+        type_name(caseExprType), "case_", params[2], statement);
     statement.expr &:= diagnosticLine(c_expr);
     statement.expr &:= "switch (";
     if not ccConf.SWITCH_WORKS_FOR_INT64TYPE then
@@ -927,16 +1035,13 @@ const proc: process (PRC_CASE_HASHSET, in reference: function,
     statement.expr &:= "hshIdxDefault0(caseLabels[";
     statement.expr &:= str(numOfCaseStmt);
     statement.expr &:= "], ";
-    if isNormalVariable(params[2]) then
-      getGenericValue(switchValue, statement);
-    else
-      getGenericValueOfVariableObject(switchValue, statement);
-    end if;
+    getRtlValue(caseExprType, variableName, statement);
     statement.expr &:= ", ";
-    process_hashcode(switchValue, statement);
+    process_hashcode(caseExprType, variableName,
+                     params[2], statement);
     statement.expr &:= ", ";
     object_address(compareObj(params[2]), statement);
-    statement.expr &:= ")) {\n";
+    statement.expr &:= ").intValue) {\n";
     process_when(numOfCaseStmt, 1, params[4], statement);
     setDiagnosticLine(statement);
     statement.expr &:= "}\n";
@@ -949,12 +1054,15 @@ const proc: process (PRC_CASE_HASHSET_DEF, in reference: function,
 
   local
     var integer: numOfCaseStmt is 0;
-    var reference: switchValue is NIL;
+    var type: caseExprType is void;
+    var string: variableName is "";
     var expr_type: statement is expr_type.value;
   begin
     case_table &:= 0 times NIL;
     numOfCaseStmt := maxIdx(case_table);
-    switchValue := getParameterAsVariable(params[2], statement);
+    caseExprType := getExprResultType(params[2]);
+    variableName := defineParameterAsVariable(
+        type_name(caseExprType), "case_", params[2], statement);
     statement.expr &:= diagnosticLine(c_expr);
     statement.expr &:= "switch (";
     if not ccConf.SWITCH_WORKS_FOR_INT64TYPE then
@@ -963,16 +1071,13 @@ const proc: process (PRC_CASE_HASHSET_DEF, in reference: function,
     statement.expr &:= "hshIdxDefault0(caseLabels[";
     statement.expr &:= str(numOfCaseStmt);
     statement.expr &:= "], ";
-    if isNormalVariable(params[2]) then
-      getGenericValue(switchValue, statement);
-    else
-      getGenericValueOfVariableObject(switchValue, statement);
-    end if;
+    getRtlValue(caseExprType, variableName, statement);
     statement.expr &:= ", ";
-    process_hashcode(switchValue, statement);
+    process_hashcode(caseExprType, variableName,
+                     params[2], statement);
     statement.expr &:= ", ";
     object_address(compareObj(params[2]), statement);
-    statement.expr &:= ")) {\n";
+    statement.expr &:= ").intValue) {\n";
     process_when(numOfCaseStmt, 1, params[4], statement);
     statement.expr &:= diagnosticLine(params[7]);
     statement.expr &:= "default:\n";
@@ -1356,7 +1461,8 @@ const proc: process (PRC_CPY, in reference: function, in ref_list: params,
     if isVar(params[3]) then
       c_expr.expr &:= "o_";
       create_name(params[3], c_expr.expr);
-    elsif getType(params[1]) = resultType(getType(params[3])) then
+    elsif getType(params[1]) = resultType(getType(params[3])) or
+        resultType(getType(params[1])) = resultType(getType(params[3])) then
       process_expr(params[3], c_expr);
     elsif getType(params[1]) = getType(params[3]) then
       create_name(params[3], objNumber(params[3]), valueName);

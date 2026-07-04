@@ -25,7 +25,9 @@
 /*                                                                  */
 /********************************************************************/
 
-actType actGen (const const_striType actionName);
-actType actIConv (intType ordinal);
-intType actOrd (actType anAction);
-striType actStr (actType anAction);
+const_actEntryType aceGen (const const_striType actionName);
+intType aceHashCode (const_actEntryType actEntry);
+const_actEntryType aceIConv (intType ordinal);
+intType aceOrd (const_actEntryType actEntry);
+striType aceStr (const_actEntryType actEntry);
+const_actEntryType aceValue (const const_objectType aReference);

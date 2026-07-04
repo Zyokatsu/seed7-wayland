@@ -24,32 +24,9 @@
 (********************************************************************)
 
 
-const ACTION: SCT_ALLOC   is action "SCT_ALLOC";
+const ACTION: SCT_CONV    is action "SCT_CONV";
 const ACTION: SCT_CPY     is action "SCT_CPY";
 const ACTION: SCT_SELECT  is action "SCT_SELECT";
-
-
-const proc: process (SCT_ALLOC, in reference: function,
-    in ref_list: params, inout expr_type: c_expr) is func
-
-  local
-    var type: param_type is void;
-    var expr_type: c_param1 is expr_type.value;
-  begin
-    param_type := getExprResultType(params[1]);
-    # prepare_typed_result(param_type, c_expr);
-    prepareAnyParamTemporarys(params[1], c_param1, c_expr);
-    c_expr.expr &:= "/* SCT_ALLOC */ (objRefType)(";
-    if c_param1.result_expr <> "" then
-      c_expr.expr &:= c_param1.result_expr;
-    else
-      typeData.typeCategory @:= [param_type] STRUCTOBJECT;
-      process_create_declaration(param_type, global_c_expr);
-      process_create_call(param_type,
-          c_param1.expr, c_expr.expr);
-    end if;
-    c_expr.expr &:= ")";
-  end func;
 
 
 const proc: process (SCT_CONV, in reference: function,
@@ -66,10 +43,12 @@ const proc: process (SCT_CPY, in reference: function,
   local
     var expr_type: statement is expr_type.value;
     var expr_type: c_param1 is expr_type.value;
+    var type: param1Type is void;
     var expr_type: c_param3 is expr_type.value;
   begin
     statement.temp_num := c_expr.temp_num;
     prepareAnyParamTemporarys(params[1], c_param1, statement);
+    param1Type := getExprResultType(params[1]);
     c_param3.demand := ASSIGN_RESULT;
     prepareAnyParamTemporarys(params[3], c_param3, statement);
     if c_param3.result_expr <> "" then
@@ -77,12 +56,12 @@ const proc: process (SCT_CPY, in reference: function,
       statement.expr &:= "new_struct=";
       statement.expr &:= c_param3.result_expr;
       statement.expr &:= ";\n";
-      process_destr_declaration(getExprResultType(params[1]), global_c_expr);
+      process_destr_declaration(param1Type, global_c_expr);
       if isNormalVariable(params[1]) then
         statement.expr &:= "new_struct->type_num = (";
         statement.expr &:= c_param1.expr;
         statement.expr &:= ")->type_num;\n";
-        process_destr_call(getExprResultType(params[1]),
+        process_destr_call(param1Type,
             c_param1.expr, statement.expr);
         statement.expr &:= c_param1.expr;
         statement.expr &:= "=new_struct;\n";
@@ -91,13 +70,13 @@ const proc: process (SCT_CPY, in reference: function,
         statement.temp_decls &:= c_param1.expr;
         statement.temp_decls &:= ");\n";
         statement.expr &:= "new_struct->type_num = (*struct_ptr)->type_num;\n";
-        process_destr_call(getExprResultType(params[1]),
+        process_destr_call(param1Type,
             "*struct_ptr", statement.expr);
         statement.expr &:= "*struct_ptr=new_struct;\n";
       end if;
     else
-      process_cpy_declaration(getExprResultType(params[1]), global_c_expr);
-      process_cpy_call(getExprResultType(params[1]),
+      process_cpy_declaration(param1Type, global_c_expr);
+      process_cpy_call(param1Type,
           c_param1.expr, c_param3.expr, statement.expr);
       statement.expr &:= ";\n";
     end if;

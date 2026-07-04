@@ -224,7 +224,7 @@ static arrayType strSplit (const const_striType mainStri,
     arrayType result_array;
 
   /* strSplit */
-    logFunction(printf("strChSplit(\"%s\", ",
+    logFunction(printf("strSplit(\"%s\", ",
                        striAsUnquotedCStri(mainStri));
                 printf("\"%s\")\n", striAsUnquotedCStri(delimiter)););
     if (ALLOC_ARRAY(result_array, INITIAL_ARRAY_SIZE)) {
@@ -430,16 +430,6 @@ objectType str_chsplit (listType arguments)
 
 
 
-objectType str_clit (listType arguments)
-
-  { /* str_clit */
-    isit_stri(arg_1(arguments));
-    return bld_stri_temp(
-        strCLit(take_stri(arg_1(arguments))));
-  } /* str_clit */
-
-
-
 /**
  *  Compare two strings.
  *  @return -1, 0 or 1 if the first argument is considered to be
@@ -594,6 +584,16 @@ objectType str_create (listType arguments)
                              (memSizeType) take_stri(dest)););
     return SYS_EMPTY_OBJECT;
   } /* str_create */
+
+
+
+objectType str_c_literal (listType arguments)
+
+  { /* str_c_literal */
+    isit_stri(arg_1(arguments));
+    return bld_stri_temp(
+        strCLiteral(take_stri(arg_1(arguments))));
+  } /* str_c_literal */
 
 
 
@@ -1034,13 +1034,13 @@ objectType str_le (listType arguments)
 
 
 
-objectType str_lit (listType arguments)
+objectType str_literal (listType arguments)
 
-  { /* str_lit */
+  { /* str_literal */
     isit_stri(arg_1(arguments));
     return bld_stri_temp(
-        strLit(take_stri(arg_1(arguments))));
-  } /* str_lit */
+        strLiteral(take_stri(arg_1(arguments))));
+  } /* str_literal */
 
 
 
@@ -1105,6 +1105,9 @@ objectType str_lpad (listType arguments)
     isit_int(arg_3(arguments));
     stri = take_stri(arg_1(arguments));
     pad_size = take_int(arg_3(arguments));
+    logFunction(printf("str_lpad(\"%s\", " FMT_D ")\n",
+                       striAsUnquotedCStri(stri),
+                       pad_size););
     striSize = stri->size;
     if (pad_size > 0 && (uintType) pad_size > striSize) {
       if (unlikely((uintType) pad_size > MAX_STRI_LEN ||
@@ -1547,6 +1550,9 @@ objectType str_rpad (listType arguments)
     isit_int(arg_3(arguments));
     stri = take_stri(arg_1(arguments));
     pad_size = take_int(arg_3(arguments));
+    logFunction(printf("str_rpad(\"%s\", " FMT_D ")\n",
+                       striAsUnquotedCStri(stri),
+                       pad_size););
     striSize = stri->size;
     if (pad_size > 0 && (uintType) pad_size > striSize) {
       if (unlikely((uintType) pad_size > MAX_STRI_LEN ||
@@ -1916,20 +1922,17 @@ objectType str_value (listType arguments)
     aReference = take_reference(arg_1(arguments));
     if (unlikely(aReference == NULL ||
                  CATEGORY_OF_OBJ(aReference) != STRIOBJECT ||
-                 take_stri(aReference) == NULL)) {
+                 (stri = take_stri(aReference)) == NULL)) {
       logError(printf("str_value(");
                trace1(aReference);
-               printf("): Category is not STRIOBJECT.\n"););
+               printf("): Not a legal STRIOBJECT.\n"););
       return raise_exception(SYS_RNG_EXCEPTION);
+    } else if (unlikely(!ALLOC_STRI_SIZE_OK(result, stri->size))) {
+      return raise_exception(SYS_MEM_EXCEPTION);
     } else {
-      stri = take_stri(aReference);
-      if (unlikely(!ALLOC_STRI_SIZE_OK(result, stri->size))) {
-        return raise_exception(SYS_MEM_EXCEPTION);
-      } else {
-        result->size = stri->size;
-        memcpy(result->mem, stri->mem,
-               result->size * sizeof(strElemType));
-        return bld_stri_temp(result);
-      } /* if */
+      result->size = stri->size;
+      memcpy(result->mem, stri->mem,
+             result->size * sizeof(strElemType));
+      return bld_stri_temp(result);
     } /* if */
   } /* str_value */

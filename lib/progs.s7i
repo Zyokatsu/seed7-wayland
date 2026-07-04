@@ -590,7 +590,19 @@ const func category: category (in reference: aReference)                 is acti
 
 (**
  *  Set the category of ''aReference'' to ''aCategory''.
- *  @exception RANGE_ERROR If ''aReference'' is NIL.
+ *  Not every reference - category combination is legal.
+ *  The categories FWDREFOBJECT, FORMPARAMOBJECT, REFOBJECT,
+ *  STRUCTELEMOBJECT, VALUEPARAMOBJECT, REFPARAMOBJECT, RESULTOBJECT,
+ *  LOCALVOBJECT, ENUMLITERALOBJECT, CONSTENUMOBJECT and VARENUMOBJECT
+ *  all refer to an object. The function ''setCategory'' allows
+ *  switching between these categories. The categories CALLOBJECT,
+ *  MATCHOBJECT, REFLISTOBJECT and EXPROBJECT all refer to a ref_list.
+ *  The function ''setCategory'' allows switching between these
+ *  categories. Setting ''aReference'' to the category it already has
+ *  is okay. All other combinations of referece and category raise
+ *  a RANGE_ERROR.
+ *  @exception RANGE_ERROR If ''aReference'' is NIL or
+ *             the category conversion is illegal.
  *)
 const proc: setCategory (in reference: aReference,
                          in category: aCategory)                         is action "REF_SETCATEGORY";
@@ -741,12 +753,11 @@ const func integer: line (in reference: aReference)                    is action
 const func integer: objNumber (in reference: aReference)               is action "REF_NUM";
 
 
-const func reference: alloc (in reference: aReference)                 is action "REF_ALLOC";
+const func reference: allocList (in category: aCategory, in reference: aReference)  is action "REF_ALLOC_LIST";
+const func reference: alloc (in category: aCategory, in reference: aReference)      is action "REF_ALLOC_REF";
 
 const func reference: alloc (in boolean: isVar, in type: aType, in integer: number) is action "REF_ALLOC_INT";
 const func reference: alloc (in boolean: isVar, in type: aType, in string: stri)    is action "REF_ALLOC_STRI";
-
-const func reference: allocVar (in type: aType, in category: aCategory)      is action "REF_ALLOC_VAR";
 
 const func boolean: getValue (in reference: aReference, attr boolean)        is action "BLN_VALUE";
 const func integer: getValue (in reference: aReference, attr integer)        is action "INT_VALUE";
@@ -756,8 +767,10 @@ const func bstring: getValue (in reference: aReference, attr bstring)        is 
 const func bitset: getValue (in reference: aReference, attr bitset)          is action "SET_VALUE";
 const func pollData: getValue (in reference: aReference, attr pollData)      is action "POL_VALUE";
 const func program: getValue (in reference: aReference, attr program)        is action "PRG_VALUE";
-const func ACTION: getValue (in reference: aReference, attr ACTION)          is action "ACT_VALUE";
+const func ACTION: getValue (in reference: aReference, attr ACTION)          is action "ACE_VALUE";
 const func clib_file: getValue (in reference: aReference, attr clib_file)    is action "FIL_VALUE";
+const func PRIMITIVE_SOCKET: getValue (in reference: aReference,
+                                       attr PRIMITIVE_SOCKET)                is action "SOC_VALUE";
 const func ref_list: getValue (in reference: aReference, attr ref_list)      is action "RFL_VALUE";
 const func bigInteger: getValue (in reference: aReference, attr bigInteger)  is action "BIG_VALUE";
 const func float: getValue (in reference: aReference, attr float)            is action "FLT_VALUE";

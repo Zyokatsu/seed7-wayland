@@ -49,49 +49,29 @@ const func boolean: boolExpr (in boolean: okay) is
   return boolean(ord(okay) + length(str(rand(1, 9))[2 ..]));
 
 
-const func boolean: raisesRangeError (in func string: expression) is func
-  result
-    var boolean: raisesRangeError is FALSE;
-  local
-    var string: exprResult is "";
+const proc: DECLARE_RAISES_RANGE_ERROR (in type: aType) is func
   begin
-    block
-      exprResult := expression;
-    exception
-      catch RANGE_ERROR:
-        raisesRangeError := TRUE;
-    end block;
+
+    const func boolean: raisesRangeError (in func aType: expression) is func
+      result
+        var boolean: raisesRangeError is FALSE;
+      local
+        var aType: exprResult is aType.value;
+      begin
+        block
+          exprResult := expression;
+        exception
+          catch RANGE_ERROR:
+            raisesRangeError := TRUE;
+        end block;
+      end func;
+
   end func;
 
 
-const func boolean: raisesRangeError (in func float: expression) is func
-  result
-    var boolean: raisesRangeError is FALSE;
-  local
-    var float: exprResult is 0.0;
-  begin
-    block
-      exprResult := expression;
-    exception
-      catch RANGE_ERROR:
-        raisesRangeError := TRUE;
-    end block;
-  end func;
-
-
-const func boolean: raisesRangeError (in func integer: expression) is func
-  result
-    var boolean: raisesRangeError is FALSE;
-  local
-    var integer: exprResult is 0;
-  begin
-    block
-      exprResult := expression;
-    exception
-      catch RANGE_ERROR:
-        raisesRangeError := TRUE;
-    end block;
-  end func;
+DECLARE_RAISES_RANGE_ERROR(string);
+DECLARE_RAISES_RANGE_ERROR(float);
+DECLARE_RAISES_RANGE_ERROR(integer);
 
 
 const proc: check_literal is func
@@ -12522,6 +12502,54 @@ const proc: check_power is func
         floatExpr( 16.0   ) ** floatExpr(0.5) <>  4.0  or
         floatExpr(100.0   ) ** floatExpr(0.5) <> 10.0  then
       writeln(" ***** A ** 0.5 does not work correctly.");
+      okay := FALSE;
+    end if;
+
+    if   1.0 ** 0.3333333333333333 <> 1.0 or
+         8.0 ** 0.3333333333333333 <> 2.0 then
+      writeln(" ***** A ** 0.3333333333333333 does not work correctly. (1)");
+      okay := FALSE;
+    end if;
+
+    if  floatExpr( 1.0) ** 0.3333333333333333 <> 1.0 or
+        floatExpr( 8.0) ** 0.3333333333333333 <> 2.0 then
+      writeln(" ***** A ** 0.3333333333333333 does not work correctly. (2)");
+      okay := FALSE;
+    end if;
+
+    if   1.0 ** floatExpr(0.3333333333333333) <> 1.0 or
+         8.0 ** floatExpr(0.3333333333333333) <> 2.0 then
+      writeln(" ***** A ** 0.3333333333333333 does not work correctly. (3)");
+      okay := FALSE;
+    end if;
+
+    if  floatExpr( 1.0) ** floatExpr(0.3333333333333333) <> 1.0 or
+        floatExpr( 8.0) ** floatExpr(0.3333333333333333) <> 2.0 then
+      writeln(" ***** A ** 0.3333333333333333 does not work correctly. (4)");
+      okay := FALSE;
+    end if;
+
+    if   1.0 ** (1.0 / 3.0) <> 1.0 or
+         8.0 ** (1.0 / 3.0) <> 2.0 then
+      writeln(" ***** A ** (1.0 / 3.0) does not work correctly. (1)");
+      okay := FALSE;
+    end if;
+
+    if  floatExpr( 1.0) ** (1.0 / 3.0) <> 1.0 or
+        floatExpr( 8.0) ** (1.0 / 3.0) <> 2.0 then
+      writeln(" ***** A ** (1.0 / 3.0) does not work correctly. (2)");
+      okay := FALSE;
+    end if;
+
+    if   1.0 ** floatExpr((1.0 / 3.0)) <> 1.0 or
+         8.0 ** floatExpr((1.0 / 3.0)) <> 2.0 then
+      writeln(" ***** A ** (1.0 / 3.0) does not work correctly. (3)");
+      okay := FALSE;
+    end if;
+
+    if  floatExpr( 1.0) ** floatExpr((1.0 / 3.0)) <> 1.0 or
+        floatExpr( 8.0) ** floatExpr((1.0 / 3.0)) <> 2.0 then
+      writeln(" ***** A ** (1.0 / 3.0) does not work correctly. (4)");
       okay := FALSE;
     end if;
 

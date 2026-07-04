@@ -39,7 +39,9 @@
 #define arg_12(arguments) arguments->next->next->next->next->next->next->next->next->next->next->next->obj
 
 #define take_act_obj(arg)    (CATEGORY_OF_OBJ(arg) == MATCHOBJECT ? take_reflist(arg)->obj : (arg))
-#define take_action(arg)     take_act_obj(arg)->value.actValue
+#define take_obj_action(arg) take_act_obj(arg)->value.actValue
+#define take_actentry(arg)   (arg)->value.actEntryValue
+#define take_action(arg)     (arg)->value.actValue
 #define take_array(arg)      (arg)->value.arrayValue
 #define take_binary(arg)     (arg)->value.binaryValue
 #define take_block(arg)      (arg)->value.blockValue
@@ -80,7 +82,8 @@
 #define hasCategory3(arg,cat1,cat2,cat3) if (unlikely(CATEGORY_OF_OBJ(arg) != (cat1) && \
                                                       CATEGORY_OF_OBJ(arg) != (cat2) && \
                                                       CATEGORY_OF_OBJ(arg) != (cat3))) expected_category(cat1, arg)
-#define isit_action(arg)     hasCategory(take_act_obj(arg), ACTOBJECT)
+#define isit_actentry(arg)   hasCategory(arg, ACTENTRYOBJECT)
+#define isit_action(arg)     hasCategory(arg, ACTOBJECT)
 #define isit_array(arg)      hasCategory(arg, ARRAYOBJECT); \
                              if (unlikely(take_array(arg) == NULL))      { empty_value(arg); return NULL; }
 #define isit_binary(arg)     hasCategory(arg, INTOBJECT)
@@ -98,6 +101,7 @@
 #define isit_interface(arg)  hasCategory2(arg, INTERFACEOBJECT, STRUCTOBJECT); \
                              if (unlikely(take_interface(arg) == NULL))  { empty_value(arg); return NULL; }
 /*      isit_enum(arg)       */
+#define isit_expr(arg)       hasCategory(arg, EXPROBJECT)
 #define isit_file(arg)       hasCategory(arg, FILEOBJECT)
 #define isit_float(arg)      hasCategory(arg, FLOATOBJECT)
 #define isit_hash(arg)       hasCategory(arg, HASHOBJECT); \
@@ -105,7 +109,6 @@
 #define isit_hashelem(arg)   hasCategory(arg, HASHELEMOBJECT); \
                              if (unlikely(take_hashelem(arg) == NULL))   { empty_value(arg); return NULL; }
 #define isit_int(arg)        hasCategory(arg, INTOBJECT)
-/*      isit_list(arg)       */
 #define isit_param(arg)      hasCategory(arg, FORMPARAMOBJECT)
 #define isit_poll(arg)       hasCategory(arg, POLLOBJECT)
 #define isit_proc(arg)       hasCategory3(arg, BLOCKOBJECT, MATCHOBJECT, ACTOBJECT)
@@ -133,6 +136,7 @@
 #define just_interface(arg)  hasCategory(arg, INTERFACEOBJECT); \
                              if (unlikely(take_interface(arg) == NULL))  { empty_value(arg); return NULL; }
 #else
+#define isit_actentry(arg)
 #define isit_action(arg)
 #define isit_array(arg)
 #define isit_bigint(arg)
@@ -144,12 +148,12 @@
 #define isit_database(arg)
 #define isit_interface(arg)
 #define isit_enum(arg)
+#define isit_expr(arg)
 #define isit_file(arg)
 #define isit_float(arg)
 #define isit_hash(arg)
 #define isit_hashelem(arg)
 #define isit_int(arg)
-#define isit_list(arg)
 #define isit_param(arg)
 #define isit_proc(arg)
 #define isit_prog(arg)
@@ -174,6 +178,7 @@
 
 
 #if WITH_TYPE_CHECK
+/* void isit_actentry (objectType argument); */
 /* void isit_action (objectType argument); */
 /* void isit_array (objectType argument); */
 /* void isit_block (objectType argument); */
@@ -183,6 +188,7 @@
 /* void isit_char (objectType argument); */
 /* void isit_interface (objectType argument); */
 void isit_enum (objectType argument);
+/* void isit_expr (objectType argument); */
 /* void isit_file (objectType argument); */
 #if WITH_FLOAT
 /* void isit_float (objectType argument); */
@@ -190,7 +196,6 @@ void isit_enum (objectType argument);
 /* void isit_hash (objectType argument); */
 /* void isit_hashelem (objectType argument); */
 /* void isit_int (objectType argument); */
-void isit_list (objectType argument);
 /* void isit_proc (objectType argument); */
 /* void isit_prog (objectType argument); */
 /* void isit_reference (objectType argument); */
@@ -204,6 +209,7 @@ void isit_list (objectType argument);
 /* void isit_pointlist (objectType argument); */
 /* void isit_process (objectType argument); */
 #endif
+objectType bld_actentry_temp (const_actEntryType temp_actentry);
 objectType bld_action_temp (actType temp_action);
 objectType bld_array_temp (arrayType temp_array);
 objectType bld_bigint_temp (bigIntType temp_bigint);
@@ -218,7 +224,6 @@ objectType bld_float_temp (double temp_float);
 objectType bld_hash_temp (hashType temp_hash);
 objectType bld_hashelem_temp (hashElemType temp_hashelem);
 objectType bld_int_temp (intType temp_int);
-objectType bld_list_temp (listType temp_list);
 objectType bld_param_temp (objectType temp_param);
 objectType bld_poll_temp (pollType temp_poll);
 objectType bld_prog_temp (progType temp_prog);
@@ -234,6 +239,9 @@ objectType bld_type_temp (typeType temp_type);
 objectType bld_win_temp (winType temp_win);
 objectType bld_pointlist_temp (bstriType temp_pointlist);
 objectType bld_process_temp (processType temp_process);
+#if CLOSE_ALL_GLOBAL_OBJECTS
+void closeAllGlobalObjects (const const_progType aProgram);
+#endif
 void dump_temp_value (objectType object);
 void dump_any_temp (objectType object);
 void dump_list (listType list);

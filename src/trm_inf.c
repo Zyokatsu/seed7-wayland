@@ -188,9 +188,9 @@ static char *read_stri_cap (FILE *fix_file, int *term_char)
       from = fgetc(fix_file);
     } /* while */
     if (pos < CAP_VALUE_BUFFER_SIZE) {
-      value[pos] = '\0';
       if (ALLOC_CSTRI(cap_value, pos)) {
-        strcpy(cap_value, value);
+        memcpy(cap_value, value, pos);
+        cap_value[pos] = '\0';
       } /* if */
     } /* if */
     *term_char = from;
@@ -236,7 +236,9 @@ static void fix_capability (void)
   {
     char *home_dir_path;
     char *terminal_name;
-    memSizeType file_name_size;
+    memSizeType home_dir_len;
+    memSizeType terminal_name_len;
+    memSizeType file_name_len;
     char *file_name;
     FILE *fix_file;
     char cap_name[CAP_NAME_BUFFER_SIZE];
@@ -254,16 +256,29 @@ static void fix_capability (void)
     if (terminal_name == NULL) {
       terminal_name = "";
     } /* if */
-    file_name_size = strlen(home_dir_path) + 6 + strlen(terminal_name);
-    if (ALLOC_CSTRI(file_name, file_name_size)) {
-      strcpy(file_name, home_dir_path);
-      len = strlen(file_name);
+    home_dir_len = strlen(home_dir_path);
+    terminal_name_len = strlen(terminal_name);
+    if (terminal_name_len > MAX_MEMSIZETYPE - 6 ||
+        home_dir_len > MAX_MEMSIZETYPE - 6 - terminal_name_len) {
+      /* The computation of file_name_len would overflow. */
+      file_name_len = 0;
+    } else {
+      /* Reserve space for optional '/' + ".term" + terminal_name. */
+      file_name_len = home_dir_len + 6 + terminal_name_len;
+    } /* if */
+    /* The macro ALLOC_CSTRI() considers the '\0' termination. */
+    /* It allocates one byte more than file_name_len.          */
+    if (file_name_len != 0 &&
+        ALLOC_CSTRI(file_name, file_name_len)) {
+      memcpy(file_name, home_dir_path, home_dir_len);
+      len = home_dir_len;
       if (len > 0 && file_name[len - 1] != '/') {
         file_name[len] = '/';
         len++;
       } /* if */
-      strcpy(&file_name[len], ".term");
-      strcat(file_name, terminal_name);
+      memcpy(&file_name[len], ".term", 5);
+      len += 5;
+      memcpy(&file_name[len], terminal_name, terminal_name_len + 1);
       if ((fix_file = fopen(file_name, "r")) != NULL) {
         do {
           read_cap_name(fix_file, cap_name, &term_char);
@@ -420,7 +435,7 @@ int outch (int ch)
 
 
 
-void putcontrol (char *control)
+void putcontrol (const char *control)
 
   { /* putcontrol */
     if (control != NULL) {

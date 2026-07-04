@@ -269,8 +269,8 @@ objectType bst_create (listType arguments)
       } /* if */
       dest->value.bstriValue = new_bstri;
       new_bstri->size = new_size;
-      memcpy_size_0_okay(new_bstri->mem, take_bstri(source)->mem,
-                         (size_t) new_size);
+      memcpy(new_bstri->mem, take_bstri(source)->mem,
+             (size_t) new_size);
     } /* if */
     logFunctionResult(printf(FMT_X_MEM "\n",
                              (memSizeType) take_bstri(dest)););
@@ -360,19 +360,15 @@ objectType bst_eq (listType arguments)
 objectType bst_hashcode (listType arguments)
 
   {
-    bstriType bstri1;
-    intType result;
+    bstriType bstri;
 
   /* bst_hashcode */
+    logFunction(printf("bst_hashcode(");
+                trace1(arg_1(arguments));
+                printf(")\n"););
     isit_bstri(arg_1(arguments));
-    bstri1 = take_bstri(arg_1(arguments));
-    if (bstri1->size == 0) {
-      result = 0;
-    } else {
-      result = (intType) ((memSizeType) bstri1->mem[0] << 5 ^
-          bstri1->size << 3 ^ bstri1->mem[bstri1->size - 1]);
-    } /* if */
-    return bld_int_temp(result);
+    bstri = take_bstri(arg_1(arguments));
+    return bld_int_temp(bstringHashCode(bstri));
   } /* bst_hashcode */
 
 
@@ -507,21 +503,17 @@ objectType bst_value (listType arguments)
     aReference = take_reference(arg_1(arguments));
     if (unlikely(aReference == NULL ||
                  CATEGORY_OF_OBJ(aReference) != BSTRIOBJECT ||
-                 take_bstri(aReference) == NULL)) {
+                 (bstri = take_bstri(aReference)) == NULL)) {
       logError(printf("bst_value(");
                trace1(aReference);
-               printf("): Category is not BSTRIOBJECT.\n"););
+               printf("): Not a legal BSTRIOBJECT.\n"););
       return raise_exception(SYS_RNG_EXCEPTION);
+    } else if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, bstri->size))) {
+      return raise_exception(SYS_MEM_EXCEPTION);
     } else {
-      bstri = take_bstri(aReference);
-      if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, bstri->size))) {
-        return raise_exception(SYS_MEM_EXCEPTION);
-      } else {
-        result->size = bstri->size;
-        memcpy_size_0_okay(result->mem, bstri->mem,
-                           (size_t) bstri->size);
-        logFunction(printf("bst_value -->\n"););
-        return bld_bstri_temp(result);
-      } /* if */
+      result->size = bstri->size;
+      memcpy(result->mem, bstri->mem, (size_t) bstri->size);
+      logFunction(printf("bst_value -->\n"););
+      return bld_bstri_temp(result);
     } /* if */
   } /* bst_value */

@@ -24,10 +24,10 @@
 (********************************************************************)
 
 
-const ACTION: REF_ALLOC          is action "REF_ALLOC";
 const ACTION: REF_ALLOC_INT      is action "REF_ALLOC_INT";
+const ACTION: REF_ALLOC_LIST     is action "REF_ALLOC_LIST";
+const ACTION: REF_ALLOC_REF      is action "REF_ALLOC_REF";
 const ACTION: REF_ALLOC_STRI     is action "REF_ALLOC_STRI";
-const ACTION: REF_ALLOC_VAR      is action "REF_ALLOC_VAR";
 const ACTION: REF_APPEND_PARAMS  is action "REF_APPEND_PARAMS";
 const ACTION: REF_ARRMAXIDX      is action "REF_ARRMAXIDX";
 const ACTION: REF_ARRMINIDX      is action "REF_ARRMINIDX";
@@ -58,7 +58,6 @@ const ACTION: REF_PATH           is action "REF_PATH";
 const ACTION: REF_RESINI         is action "REF_RESINI";
 const ACTION: REF_RESULT         is action "REF_RESULT";
 const ACTION: REF_SCTTOLIST      is action "REF_SCTTOLIST";
-const ACTION: REF_SELECT         is action "REF_SELECT";
 const ACTION: REF_SETCATEGORY    is action "REF_SETCATEGORY";
 const ACTION: REF_SETPARAMS      is action "REF_SETPARAMS";
 const ACTION: REF_SETTYPE        is action "REF_SETTYPE";
@@ -72,10 +71,10 @@ const ACTION: REF_VALUE          is action "REF_VALUE";
 const proc: ref_prototypes (inout file: c_prog) is func
 
   begin
-    declareExtern(c_prog, "objRefType  refAlloc (const const_objRefType);");
     declareExtern(c_prog, "objRefType  refAllocInt (boolType, typeType, intType);");
+    declareExtern(c_prog, "objRefType  refAllocList (const intType, const const_objRefType);");
+    declareExtern(c_prog, "objRefType  refAllocRef (const intType, const const_objRefType);");
     declareExtern(c_prog, "objRefType  refAllocStri (boolType, typeType, const const_striType);");
-    declareExtern(c_prog, "objRefType  refAllocVar (typeType, const intType);");
     declareExtern(c_prog, "void        refAppendParams (objRefType, const_listType);");
     declareExtern(c_prog, "intType     refArrMaxIdx (const const_objRefType);");
     declareExtern(c_prog, "intType     refArrMinIdx (const const_objRefType);");
@@ -111,17 +110,6 @@ const proc: ref_prototypes (inout file: c_prog) is func
   end func;
 
 
-const proc: process (REF_ALLOC, in reference: function,
-    in ref_list: params, inout expr_type: c_expr) is func
-
-  begin
-    programUses.compDataLibrary := TRUE;
-    c_expr.expr &:= "refAlloc(";
-    process_expr(params[1], c_expr);
-    c_expr.expr &:= ")";
-  end func;
-
-
 const proc: process (REF_ALLOC_INT, in reference: function,
     in ref_list: params, inout expr_type: c_expr) is func
 
@@ -137,6 +125,32 @@ const proc: process (REF_ALLOC_INT, in reference: function,
   end func;
 
 
+const proc: process (REF_ALLOC_LIST, in reference: function,
+    in ref_list: params, inout expr_type: c_expr) is func
+
+  begin
+    programUses.compDataLibrary := TRUE;
+    c_expr.expr &:= "refAllocList(";
+    process_expr(params[1], c_expr);
+    c_expr.expr &:= ", ";
+    process_expr(params[2], c_expr);
+    c_expr.expr &:= ")";
+  end func;
+
+
+const proc: process (REF_ALLOC_REF, in reference: function,
+    in ref_list: params, inout expr_type: c_expr) is func
+
+  begin
+    programUses.compDataLibrary := TRUE;
+    c_expr.expr &:= "refAllocRef(";
+    process_expr(params[1], c_expr);
+    c_expr.expr &:= ", ";
+    process_expr(params[2], c_expr);
+    c_expr.expr &:= ")";
+  end func;
+
+
 const proc: process (REF_ALLOC_STRI, in reference: function,
     in ref_list: params, inout expr_type: c_expr) is func
 
@@ -148,19 +162,6 @@ const proc: process (REF_ALLOC_STRI, in reference: function,
     process_expr(params[2], c_expr);
     c_expr.expr &:= ", ";
     getAnyParamToExpr(params[3], c_expr);
-    c_expr.expr &:= ")";
-  end func;
-
-
-const proc: process (REF_ALLOC_VAR, in reference: function,
-    in ref_list: params, inout expr_type: c_expr) is func
-
-  begin
-    programUses.compDataLibrary := TRUE;
-    c_expr.expr &:= "refAllocVar(";
-    process_expr(params[1], c_expr);
-    c_expr.expr &:= ", ";
-    process_expr(params[2], c_expr);
     c_expr.expr &:= ")";
   end func;
 
@@ -509,34 +510,6 @@ const proc: process (REF_SCTTOLIST, in reference: function,
   end func;
 
 
-const proc: process (REF_SELECT, in reference: function,
-    in ref_list: params, inout expr_type: c_expr) is func
-
-  local
-    var type: object_type is void;
-  begin
-    object_type := getExprResultType(params[1]);
-    if object_type in typeData.struct_element_idx and
-        params[3] in typeData.struct_element_idx[object_type] then
-      if category(params[1]) = REFPARAMOBJECT and isVar(params[1]) then
-        c_expr.expr &:= "(*((structType *)(";
-        getAnyParamToExpr(params[1], c_expr);
-        c_expr.expr &:= ")))->stru[";
-      else
-        c_expr.expr &:= "((structType)(";
-        getAnyParamToExpr(params[1], c_expr);
-        c_expr.expr &:= "))->stru[";
-      end if;
-      c_expr.expr &:= str(typeData.struct_element_idx[object_type][params[3]]);
-      c_expr.expr &:= "]";
-      c_expr.expr &:= select_value_from_rtlObjectStruct(resultType(getType(function)));
-      c_expr.expr &:= "/*->o_";
-      create_name2(params[3], c_expr.expr);
-      c_expr.expr &:= "*/";
-    end if;
-  end func;
-
-
 const proc: process (REF_SETCATEGORY, in reference: function,
     in ref_list: params, inout expr_type: c_expr) is func
 
@@ -702,7 +675,17 @@ const proc: process (REF_TRACE, in reference: function,
           c_expr.expr &:= "}\n";
           c_expr.expr &:= "}\n";
         when {SOCKETOBJECT}:
-          c_expr.expr &:= "printf(\"<SOCKETOBJECT>\")";
+          c_expr.expr &:= "{\n";
+          c_expr.expr &:= "socketType socket=";
+          c_expr.expr &:= param1.expr;
+          c_expr.expr &:= ";\n";
+          c_expr.expr &:= "printf(\"<SOCKETOBJECT>\");\n";
+          c_expr.expr &:= "if (socket == NULL) {\n";
+          c_expr.expr &:= "printf(\"  *NULL_SOCKET* \");\n";
+          c_expr.expr &:= "} else {\n";
+          c_expr.expr &:= "printf(\" socket %d\", socket->socketNumber);\n";
+          c_expr.expr &:= "}\n";
+          c_expr.expr &:= "}\n";
         when {POLLOBJECT}:
           c_expr.expr &:= "printf(\"<POLLOBJECT>\")";
         when {TYPEOBJECT}:

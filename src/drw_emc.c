@@ -1699,14 +1699,17 @@ static char *getNameFromTitle (const char *winTitle, memSizeType *winNameSize)
     while (*winTitle != ' ' && *winTitle != '\0') {
       winTitle++;
     } /* while */
+    /* Reserve additional 16 hex digits for the random suffix. */
     nameSize = (memSizeType) (winTitle - startPos) + 16;
     *winNameSize = nameSize;
+    /* The macro ALLOC_CSTRI() considers the '\0' termination. */
+    /* It allocates one byte more than nameSize.               */
     if (unlikely(!ALLOC_CSTRI(winName, nameSize))) {
       logError(printf("getNameFromTitle(\"%s\"): malloc(" FMT_U_MEM ") failed\n",
                       winTitle, nameSize););
     } else {
       memcpy(winName, startPos, nameSize - 16);
-      sprintf(&winName[nameSize - 16], FMT_X64, uintRand());
+      sprintf(&winName[nameSize - 16], F_X64(016), uintRand());
     } /* if */
     logFunction(printf("getNameFromTitle(\"%s\", " FMT_U_MEM ") --> \"%s\"\n",
                         winTitle, *winNameSize,

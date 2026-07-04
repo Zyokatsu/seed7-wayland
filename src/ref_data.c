@@ -71,46 +71,6 @@
 
 
 
-objectType refAlloc (const const_objectType obj1)
-
-  {
-    propertyType created_property;
-    objectType created_object;
-
-  /* refAlloc */
-    logFunction(printf("refAlloc(" FMT_U_MEM ")",
-                       (memSizeType) obj1););
-    if (unlikely(!ALLOC_OBJECT(created_object))) {
-      raise_error(MEMORY_ERROR);
-    } else {
-      if (HAS_PROPERTY(obj1)) {
-        if (unlikely(!ALLOC_PROPERTY(created_property))) {
-          FREE_OBJECT(created_object);
-          raise_error(MEMORY_ERROR);
-          return NULL;
-        } else {
-          created_property->entity = obj1->descriptor.property->entity;
-          created_property->params = obj1->descriptor.property->params;
-          created_property->file_number = PROPERTY_FILE_NUM(obj1);
-          created_property->line        = PROPERTY_LINE_NUM(obj1);
-          /* created_property->syNumberInLine = obj1->descriptor.property->syNumberInLine; */
-          created_object->descriptor.property = created_property;
-        } /* if */
-      } else {
-        created_object->descriptor.posinfo = obj1->descriptor.posinfo;
-      } /* if */
-      created_object->type_of = obj1->type_of;
-      /* Copies the POSINFO flag (and all other flags): */
-      INIT_CATEGORY_OF_OBJ(created_object, obj1->objcategory);
-      created_object->value.objValue = NULL;
-    } /* if */
-    logFunction(printf("refAlloc -> " FMT_U_MEM "\n",
-                        (memSizeType) created_object););
-    return created_object;
-  } /* refAlloc */
-
-
-
 objectType refAllocInt (boolType isVar, typeType aType,
     const intType number)
 
@@ -133,8 +93,153 @@ objectType refAllocInt (boolType isVar, typeType aType,
       } /* if */
       created_object->value.intValue = number;
     } /* if */
+    logFunction(printf("refAllocInt --> ");
+                trace1(created_object);
+                printf("\n"););
     return created_object;
   } /* refAllocInt */
+
+
+
+objectType refAllocList (const intType aCategory,
+    const const_objectType obj1)
+
+  {
+    objectCategory objCategory;
+    objectType created_object;
+
+  /* refAllocList */
+    logFunction(printf("refAllocList(");
+                printcategory((objectCategory) aCategory);
+                printf(", ");
+                trace1(obj1);
+                printf(")\n"););
+    if (unlikely(aCategory != CALLOBJECT &&
+                 aCategory != MATCHOBJECT &&
+                 aCategory != LISTOBJECT &&
+                 aCategory != REFLISTOBJECT &&
+                 aCategory != EXPROBJECT)) {
+      logError(printf("refAllocList(");
+               printcategory((objectCategory) aCategory);
+               printf(", ");
+               trace1(obj1);
+               printf("): Not a object list category.\n"););
+      raise_error(RANGE_ERROR);
+      created_object = NULL;
+    } else if (unlikely(obj1 == NULL ||
+                        (objCategory = CATEGORY_OF_OBJ(obj1),
+                         objCategory != BLOCKOBJECT &&
+                         objCategory != ACTOBJECT))) {
+      logError(printf("refAllocList(");
+               printcategory((objectCategory) aCategory);
+               printf(", ");
+               trace1(obj1);
+               printf("): Neiter BLOCKOBJECT nor ACTOBJECT.\n"););
+      raise_error(RANGE_ERROR);
+      created_object = NULL;
+    } else if (unlikely(!ALLOC_OBJECT(created_object))) {
+      raise_error(MEMORY_ERROR);
+    } else {
+      created_object->type_of = obj1->type_of;
+      if (HAS_POSINFO(obj1)) {
+        created_object->descriptor.posinfo = obj1->descriptor.posinfo;
+        INIT_CATEGORY_OF_POSINFO(created_object, aCategory);
+      } else {
+        created_object->descriptor.property = NULL;
+        INIT_CATEGORY_OF_OBJ(created_object, aCategory);
+      } /* if */
+      created_object->value.listValue = NULL;
+    } /* if */
+    logFunction(printf("refAllocList --> ");
+                trace1(created_object);
+                printf("\n"););
+    return created_object;
+  } /* refAllocList */
+
+
+
+objectType refAllocRef (const intType aCategory,
+    const const_objectType obj1)
+
+  {
+    objectCategory objCategory;
+    propertyType created_property;
+    objectType created_object;
+
+  /* refAllocRef */
+    logFunction(printf("refAllocRef(");
+                printcategory((objectCategory) aCategory);
+                printf(", ");
+                trace1(obj1);
+                printf(")\n"););
+    if (unlikely(aCategory != FWDREFOBJECT &&
+                 aCategory != FORMPARAMOBJECT &&
+                 aCategory != REFOBJECT &&
+                 aCategory != STRUCTELEMOBJECT &&
+                 aCategory != VALUEPARAMOBJECT &&
+                 aCategory != REFPARAMOBJECT &&
+                 aCategory != RESULTOBJECT &&
+                 aCategory != LOCALVOBJECT &&
+                 aCategory != ENUMLITERALOBJECT &&
+                 aCategory != CONSTENUMOBJECT &&
+                 aCategory != VARENUMOBJECT)) {
+      logError(printf("refAllocRef(");
+               printcategory((objectCategory) aCategory);
+               printf(", ");
+               trace1(obj1);
+               printf("): Not a object reference category.\n"););
+      raise_error(RANGE_ERROR);
+      created_object = NULL;
+    } else if (unlikely(obj1 == NULL ||
+                        (objCategory = CATEGORY_OF_OBJ(obj1),
+                         objCategory != FWDREFOBJECT &&
+                         objCategory != FORMPARAMOBJECT &&
+                         objCategory != REFOBJECT &&
+                         objCategory != STRUCTELEMOBJECT &&
+                         objCategory != VALUEPARAMOBJECT &&
+                         objCategory != REFPARAMOBJECT &&
+                         objCategory != RESULTOBJECT &&
+                         objCategory != LOCALVOBJECT &&
+                         objCategory != ENUMLITERALOBJECT &&
+                         objCategory != CONSTENUMOBJECT &&
+                         objCategory != VARENUMOBJECT))) {
+      logError(printf("refAllocRef(");
+               printcategory((objectCategory) aCategory);
+               printf(", ");
+               trace1(obj1);
+               printf("): Not a legal object reference.\n"););
+      raise_error(RANGE_ERROR);
+      created_object = NULL;
+    } else if (unlikely(!ALLOC_OBJECT(created_object))) {
+      raise_error(MEMORY_ERROR);
+    } else {
+      if (HAS_PROPERTY(obj1)) {
+        if (unlikely(!ALLOC_PROPERTY(created_property))) {
+          FREE_OBJECT(created_object);
+          raise_error(MEMORY_ERROR);
+          return NULL;
+        } else {
+          created_property->entity = obj1->descriptor.property->entity;
+          created_property->params = obj1->descriptor.property->params;
+          created_property->file_number = PROPERTY_FILE_NUM(obj1);
+          created_property->line        = PROPERTY_LINE_NUM(obj1);
+          /* created_property->syNumberInLine = obj1->descriptor.property->syNumberInLine; */
+          created_object->descriptor.property = created_property;
+        } /* if */
+      } else {
+        created_object->descriptor.posinfo = obj1->descriptor.posinfo;
+      } /* if */
+      created_object->type_of = obj1->type_of;
+      /* Copies the POSINFO flag (and all other flags): */
+      INIT_CATEGORY_OF_OBJ(created_object, obj1->objcategory);
+      SET_CATEGORY_OF_OBJ(created_object, aCategory);
+      created_object->value.objValue = NULL;
+    } /* if */
+    logFunction(printf("refAllocRef -> ");
+                trace1(created_object);
+                printf("\n"););
+    return created_object;
+  } /* refAllocRef */
 
 
 
@@ -161,42 +266,11 @@ objectType refAllocStri (boolType isVar, typeType aType,
       } /* if */
       created_object->value.striValue = strCreate(stri);
     } /* if */
+    logFunction(printf("refAllocStri --> ");
+                trace1(created_object);
+                printf("\n"););
     return created_object;
   } /* refAllocStri */
-
-
-
-objectType refAllocVar (typeType aType, const intType aCategory)
-
-  {
-    errInfoType err_info = OKAY_NO_ERROR;
-    objectType created_object;
-
-  /* refAllocVar */
-    logFunction(printf("refAllocVar(");
-                printtype(aType);
-                printf(", ");
-                printcategory(aCategory);
-                printf(")\n"););
-    if (unlikely(!ALLOC_OBJECT(created_object))) {
-      raise_error(MEMORY_ERROR);
-    } else if (unlikely(aType->owningProg == NULL)) {
-      raise_error(RANGE_ERROR);
-    } else {
-      incl_list(&aType->owningProg->allocated_objects, created_object, &err_info);
-      if (unlikely(err_info != OKAY_NO_ERROR)) {
-        FREE_OBJECT(created_object);
-        raise_error(MEMORY_ERROR);
-      } else {
-        created_object->type_of = aType;
-        created_object->descriptor.property = NULL;
-        INIT_CATEGORY_OF_OBJ(created_object, aCategory);
-        SET_VAR_FLAG(created_object);
-        memset(&created_object->value, 0, sizeof(valueUnion));
-      } /* if */
-    } /* if */
-    return created_object;
-  } /* refAllocVar */
 
 
 
@@ -262,17 +336,26 @@ void refAppendParams (objectType funcRef, const_listType params)
  */
 intType refArrMaxIdx (const const_objectType arrayRef)
 
-  { /* refArrMaxIdx */
+  {
+    arrayType arrayValue;
+    intType maxIdx;
+
+  /* refArrMaxIdx */
+    logFunction(printf("refArrMaxIdx(");
+                trace1(arrayRef);
+                printf(")\n"););
     if (unlikely(arrayRef == NULL ||
-                 CATEGORY_OF_OBJ(arrayRef) != ARRAYOBJECT)) {
+                 CATEGORY_OF_OBJ(arrayRef) != ARRAYOBJECT ||
+                 (arrayValue = take_array(arrayRef)) == NULL)) {
       logError(printf("refArrMaxIdx(");
                trace1(arrayRef);
-               printf("): Category is not ARRAYOBJECT.\n"););
+               printf("): Not a legal ARRAYOBJECT.\n"););
       raise_error(RANGE_ERROR);
-      return 0;
+      maxIdx = 0;
     } else {
-      return take_array(arrayRef)->max_position;
+      maxIdx = arrayValue->max_position;
     } /* if */
+    return maxIdx;
   } /* refArrMaxIdx */
 
 
@@ -285,17 +368,26 @@ intType refArrMaxIdx (const const_objectType arrayRef)
  */
 intType refArrMinIdx (const const_objectType arrayRef)
 
-  { /* refArrMinIdx */
+  {
+    arrayType arrayValue;
+    intType minIdx;
+
+  /* refArrMinIdx */
+    logFunction(printf("refArrMinIdx(");
+                trace1(arrayRef);
+                printf(")\n"););
     if (unlikely(arrayRef == NULL ||
-                 CATEGORY_OF_OBJ(arrayRef) != ARRAYOBJECT)) {
+                 CATEGORY_OF_OBJ(arrayRef) != ARRAYOBJECT ||
+                 (arrayValue = take_array(arrayRef)) == NULL)) {
       logError(printf("refArrMinIdx(");
                trace1(arrayRef);
-               printf("): Category is not ARRAYOBJECT.\n"););
+               printf("): Not a legal ARRAYOBJECT.\n"););
       raise_error(RANGE_ERROR);
-      return 0;
+      minIdx = 0;
     } else {
-      return take_array(arrayRef)->min_position;
+      minIdx = arrayValue->min_position;
     } /* if */
+    return minIdx;
   } /* refArrMinIdx */
 
 
@@ -308,28 +400,30 @@ listType refArrToList (const const_objectType arrayRef)
     listType result;
 
   /* refArrToList */
+    logFunction(printf("refArrToList(");
+                trace1(arrayRef);
+                printf(")\n"););
     if (unlikely(arrayRef == NULL ||
-                 CATEGORY_OF_OBJ(arrayRef) != ARRAYOBJECT)) {
+                 CATEGORY_OF_OBJ(arrayRef) != ARRAYOBJECT ||
+                 (arrayValue = take_array(arrayRef)) == NULL)) {
       logError(printf("refArrToList(");
                trace1(arrayRef);
-               printf("): Category is not ARRAYOBJECT.\n"););
+               printf("): Not a legal ARRAYOBJECT.\n"););
+      raise_error(RANGE_ERROR);
+      result = NULL;
+    } else if (unlikely(arrayValue->min_position >
+                        arrayValue->max_position &&
+                        arraySize(arrayValue) != 0)) {
+      logError(printf("refArrToList(");
+               trace1(arrayRef);
+               printf("): Illegal array value.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
-      arrayValue = take_array(arrayRef);
-      if (unlikely(arrayValue->min_position > arrayValue->max_position &&
-                   arraySize(arrayValue) != 0)) {
-        logError(printf("refArrToList(");
-                 trace1(arrayRef);
-                 printf("): Illegal array value.\n"););
-        raise_error(RANGE_ERROR);
+      result = array_to_list(arrayValue, &err_info);
+      if (unlikely(err_info != OKAY_NO_ERROR)) {
+        raise_error(err_info);
         result = NULL;
-      } else {
-        result = array_to_list(arrayValue, &err_info);
-        if (unlikely(err_info != OKAY_NO_ERROR)) {
-          raise_error(err_info);
-          result = NULL;
-        } /* if */
       } /* if */
     } /* if */
     return result;
@@ -346,18 +440,20 @@ listType refArrToList (const const_objectType arrayRef)
 objectType refBody (const const_objectType funcRef)
 
   {
+    blockType block;
     objectType result;
 
   /* refBody */
     if (unlikely(funcRef == NULL ||
-                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT)) {
+                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT ||
+                 (block = take_block(funcRef)) == NULL)) {
       logError(printf("refBody(");
                trace1(funcRef);
-               printf("): Category is not BLOCKOBJECT.\n"););
+               printf("): Not a legal BLOCKOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
-      result = funcRef->value.blockValue->body;
+      result = block->body;
     } /* if */
     return result;
   } /* refBody */
@@ -400,6 +496,8 @@ intType refCatParse (const const_striType catName)
     intType category;
 
   /* refCatParse */
+    logFunction(printf("refCatParse(\"%s\")\n",
+                       striAsUnquotedCStri(catName)););
     if (unlikely(catName->size > MAX_CSTRI_BUFFER_LEN)) {
       category = -1;
     } else {
@@ -472,19 +570,24 @@ striType refFile (const const_objectType aReference)
 listType refHshDataToList (const const_objectType aReference)
 
   {
+    hashType hash;
     errInfoType err_info = OKAY_NO_ERROR;
     listType result;
 
   /* refHshDataToList */
+    logFunction(printf("refHshDataToList(");
+                trace1(aReference);
+                printf(")\n"););
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != HASHOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != HASHOBJECT ||
+                 (hash = take_hash(aReference)) == NULL)) {
       logError(printf("refHshDataToList(");
                trace1(aReference);
-               printf("): Category is not HASHOBJECT.\n"););
+               printf("): Not a legal HASHOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
-      result = hash_data_to_list(take_hash(aReference), &err_info);
+      result = hash_data_to_list(hash, &err_info);
       if (unlikely(err_info != OKAY_NO_ERROR)) {
         raise_error(MEMORY_ERROR);
         result = NULL;
@@ -498,19 +601,24 @@ listType refHshDataToList (const const_objectType aReference)
 listType refHshKeysToList (const const_objectType aReference)
 
   {
+    hashType hash;
     errInfoType err_info = OKAY_NO_ERROR;
     listType result;
 
   /* refHshKeysToList */
+    logFunction(printf("refHshKeysToList(");
+                trace1(aReference);
+                printf(")\n"););
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != HASHOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != HASHOBJECT ||
+                 (hash = take_hash(aReference)) == NULL)) {
       logError(printf("refHshKeysToList(");
                trace1(aReference);
-               printf("): Category is not HASHOBJECT.\n"););
+               printf("): Not a legal HASHOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
-      result = hash_keys_to_list(take_hash(aReference), &err_info);
+      result = hash_keys_to_list(hash, &err_info);
       if (unlikely(err_info != OKAY_NO_ERROR)) {
         raise_error(MEMORY_ERROR);
         result = NULL;
@@ -524,18 +632,23 @@ listType refHshKeysToList (const const_objectType aReference)
 intType refHshLength (const const_objectType aReference)
 
   {
+    hashType hash;
     intType length;
 
   /* refHshLength */
+    logFunction(printf("refHshLength(");
+                trace1(aReference);
+                printf(")\n"););
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != HASHOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != HASHOBJECT ||
+                 (hash = take_hash(aReference)) == NULL)) {
       logError(printf("refHshLength(");
                trace1(aReference);
-               printf("): Category is not HASHOBJECT.\n"););
+               printf("): Not a legal HASHOBJECT.\n"););
       raise_error(RANGE_ERROR);
       length = 0;
     } else {
-      length = (intType) take_hash(aReference)->size;
+      length = (intType) hash->size;
     } /* if */
     return length;
   } /* refHshLength */
@@ -654,6 +767,7 @@ intType refLine (const const_objectType aReference)
 listType refLocalConsts (const const_objectType funcRef)
 
   {
+    blockType block;
     listType local_elem;
     listType *list_insert_place;
     errInfoType err_info = OKAY_NO_ERROR;
@@ -661,14 +775,15 @@ listType refLocalConsts (const const_objectType funcRef)
 
   /* refLocalConsts */
     if (unlikely(funcRef == NULL ||
-                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT)) {
+                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT ||
+                 (block = take_block(funcRef)) == NULL)) {
       logError(printf("refLocalConsts(");
                trace1(funcRef);
-               printf("): Category is not BLOCKOBJECT.\n"););
+               printf("): Not a legal BLOCKOBJECT.\n"););
       raise_error(RANGE_ERROR);
     } else {
       list_insert_place = &localConsts;
-      local_elem = funcRef->value.blockValue->local_consts;
+      local_elem = block->local_consts;
       while (local_elem != NULL) {
         list_insert_place = append_element_to_list(list_insert_place,
             local_elem->obj, &err_info);
@@ -695,6 +810,7 @@ listType refLocalConsts (const const_objectType funcRef)
 listType refLocalVars (const const_objectType funcRef)
 
   {
+    blockType block;
     locListType local_elem;
     listType *list_insert_place;
     errInfoType err_info = OKAY_NO_ERROR;
@@ -702,14 +818,15 @@ listType refLocalVars (const const_objectType funcRef)
 
   /* refLocalVars */
     if (unlikely(funcRef == NULL ||
-                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT)) {
+                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT ||
+                 (block = take_block(funcRef)) == NULL)) {
       logError(printf("refLocalVars(");
                trace1(funcRef);
-               printf("): Category is not BLOCKOBJECT.\n"););
+               printf("): Not a legal BLOCKOBJECT.\n"););
       raise_error(RANGE_ERROR);
     } else {
       list_insert_place = &localVars;
-      local_elem = funcRef->value.blockValue->local_vars;
+      local_elem = block->local_vars;
       while (local_elem != NULL) {
         list_insert_place = append_element_to_list(list_insert_place,
             local_elem->local.object, &err_info);
@@ -750,7 +867,7 @@ intType refNum (const const_objectType aReference)
       raise_error(RANGE_ERROR);
       objectNumber = 0;
     } else {
-      objectNumber = (intType) hshIdxEnterDefault(
+      objectNumber = (intType) hshIdxEnterGeneric(
           (const rtlHashType) aReference->type_of->owningProg->objectNumberMap,
           (genericType) (memSizeType) aReference,
           (genericType) aReference->type_of->owningProg->nextFreeObjectNumber,
@@ -831,18 +948,20 @@ striType refPath (const const_objectType aReference)
 objectType refResini (const const_objectType funcRef)
 
   {
+    blockType block;
     objectType result;
 
   /* refResini */
     if (unlikely(funcRef == NULL ||
-                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT)) {
+                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT ||
+                 (block = take_block(funcRef)) == NULL)) {
       logError(printf("refResini(");
                trace1(funcRef);
-               printf("): Category is not BLOCKOBJECT.\n"););
+               printf("): Not a legal BLOCKOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
-      result = funcRef->value.blockValue->result.init_value;
+      result = block->result.init_value;
     } /* if */
     return result;
   } /* refResini */
@@ -858,18 +977,20 @@ objectType refResini (const const_objectType funcRef)
 objectType refResult (const const_objectType funcRef)
 
   {
+    blockType block;
     objectType result;
 
   /* refResult */
     if (unlikely(funcRef == NULL ||
-                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT)) {
+                 CATEGORY_OF_OBJ(funcRef) != BLOCKOBJECT ||
+                 (block = take_block(funcRef)) == NULL)) {
       logError(printf("refResult(");
                trace1(funcRef);
-               printf("): Category is not BLOCKOBJECT.\n"););
+               printf("): Not a legal BLOCKOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
-      result = funcRef->value.blockValue->result.object;
+      result = block->result.object;
     } /* if */
     return result;
   } /* refResult */
@@ -879,19 +1000,21 @@ objectType refResult (const const_objectType funcRef)
 listType refSctToList (const const_objectType aReference)
 
   {
+    structType stru;
     errInfoType err_info = OKAY_NO_ERROR;
     listType result;
 
   /* refSctToList */
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != STRUCTOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != STRUCTOBJECT ||
+                 (stru = take_struct(aReference)) == NULL)) {
       logError(printf("refSctToList(");
                trace1(aReference);
-               printf("): Category is not STRUCTOBJECT.\n"););
+               printf("): Not a legal STRUCTOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
-      result = struct_to_list(take_struct(aReference), &err_info);
+      result = struct_to_list(stru, &err_info);
       if (unlikely(err_info != OKAY_NO_ERROR)) {
         raise_error(MEMORY_ERROR);
         result = NULL;
@@ -904,20 +1027,72 @@ listType refSctToList (const const_objectType aReference)
 
 /**
  *  Set the category of 'aReference' to 'aCategory'.
- *  @exception RANGE_ERROR If 'aReference' is NIL.
+ *  @exception RANGE_ERROR If 'aReference' is NIL or
+ *             the category conversion is illegal.
  */
 void refSetCategory (objectType aReference, intType aCategory)
 
-  { /* refSetCategory */
+  {
+    objectCategory objCategory;
+
+  /* refSetCategory */
     logFunction(printf("refSetCategory(");
                 trace1(aReference);
-                printf(", " FMT_D ")\n", aCategory););
+                printf(", ");
+                printcategory((objectCategory) aCategory);
+                printf(")\n"););
     if (unlikely(aReference == NULL)) {
-      logError(printf("refSetCategory(NULL, " FMT_D "): Object is NULL.\n",
-                      aCategory););
+      logError(printf("refSetCategory(NULL, ");
+               printcategory((objectCategory) aCategory);
+               printf("): Object is NULL.\n"););
       raise_error(RANGE_ERROR);
     } else {
-      SET_CATEGORY_OF_OBJ(aReference, aCategory);
+      objCategory = CATEGORY_OF_OBJ(aReference);
+      if (objCategory != aCategory) {
+        if (((objCategory == FWDREFOBJECT ||
+              objCategory == FORMPARAMOBJECT ||
+              objCategory == REFOBJECT ||
+              objCategory == STRUCTELEMOBJECT ||
+              objCategory == VALUEPARAMOBJECT ||
+              objCategory == REFPARAMOBJECT ||
+              objCategory == RESULTOBJECT ||
+              objCategory == LOCALVOBJECT ||
+              objCategory == ENUMLITERALOBJECT ||
+              objCategory == CONSTENUMOBJECT ||
+              objCategory == VARENUMOBJECT) &&
+             (aCategory == FWDREFOBJECT ||
+              aCategory == FORMPARAMOBJECT ||
+              aCategory == REFOBJECT ||
+              aCategory == STRUCTELEMOBJECT ||
+              aCategory == VALUEPARAMOBJECT ||
+              aCategory == REFPARAMOBJECT ||
+              aCategory == RESULTOBJECT ||
+              aCategory == LOCALVOBJECT ||
+              aCategory == ENUMLITERALOBJECT ||
+              aCategory == CONSTENUMOBJECT ||
+              aCategory == VARENUMOBJECT)) ||
+          ((objCategory == CALLOBJECT ||
+              objCategory == MATCHOBJECT ||
+              objCategory == REFLISTOBJECT ||
+              objCategory == EXPROBJECT) &&
+           (aCategory == CALLOBJECT ||
+              aCategory == MATCHOBJECT ||
+              aCategory == REFLISTOBJECT ||
+              aCategory == EXPROBJECT))) {
+          SET_CATEGORY_OF_OBJ(aReference, aCategory);
+        } else {
+          logError(printf("refSetCategory(");
+                   trace1(aReference);
+                   printf(", ");
+                   printcategory((objectCategory) aCategory);
+                   printf("): Cannot convert ");
+                   printcategory(objCategory);
+                   printf(" to ");
+                   printcategory((objectCategory) aCategory);
+                   printf(".\n"););
+          raise_error(RANGE_ERROR);
+        } /* if */
+      } /* if */
     } /* if */
   } /* refSetCategory */
 
@@ -1136,29 +1311,6 @@ typeType refType (const const_objectType aReference)
 
 
 /**
- *  Get 'ACTION' value of the object referenced by 'aReference'.
- *  @return the 'ACTION' value of the referenced object.
- *  @exception RANGE_ERROR If 'aReference' is NIL or
- *             category(aReference) <> ACTOBJECT holds.
- */
-actType actValue (const const_objectType aReference)
-
-  { /* actValue */
-    if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != ACTOBJECT)) {
-      logError(printf("actValue(");
-               trace1(aReference);
-               printf("): Category is not ACTOBJECT.\n"););
-      raise_error(RANGE_ERROR);
-      return NULL;
-    } else {
-      return take_action(aReference);
-    } /* if */
-  } /* actValue */
-
-
-
-/**
  *  Get 'bigInteger' value of the object referenced by 'aReference'.
  *  @return the 'bigInteger' value of the referenced object.
  *  @exception RANGE_ERROR If 'aReference' is NIL or
@@ -1166,16 +1318,20 @@ actType actValue (const const_objectType aReference)
  */
 bigIntType bigValue (const const_objectType aReference)
 
-  { /* bigValue */
+  {
+    bigIntType number;
+
+  /* bigValue */
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != BIGINTOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != BIGINTOBJECT ||
+                 (number = take_bigint(aReference)) == NULL)) {
       logError(printf("bigValue(");
                trace1(aReference);
-               printf("): Category is not BIGINTOBJECT.\n"););
+               printf("): Not a legal BIGINTOBJECT.\n"););
       raise_error(RANGE_ERROR);
       return NULL;
     } else {
-      return bigCreate(take_bigint(aReference));
+      return bigCreate(number);
     } /* if */
   } /* bigValue */
 
@@ -1231,17 +1387,14 @@ bstriType bstValue (const const_objectType aReference)
                  (bstri = take_bstri(aReference)) == NULL)) {
       logError(printf("bstValue(");
                trace1(aReference);
-               printf("): Category is not BSTRIOBJECT.\n"););
+               printf("): Not a legal BSTRIOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
+    } else if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, bstri->size))) {
+      raise_error(MEMORY_ERROR);
     } else {
-      if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, bstri->size))) {
-        raise_error(MEMORY_ERROR);
-      } else {
-        result->size = bstri->size;
-        memcpy_size_0_okay(result->mem, bstri->mem,
-                           (size_t) (bstri->size));
-      } /* if */
+      result->size = bstri->size;
+      memcpy(result->mem, bstri->mem, (size_t) (bstri->size));
     } /* if */
     return result;
   } /* bstValue */
@@ -1261,7 +1414,7 @@ charType chrValue (const const_objectType aReference)
                  CATEGORY_OF_OBJ(aReference) != CHAROBJECT)) {
       logError(printf("chrValue(");
                trace1(aReference);
-               printf("): Category is not CHAROBJECT.\n"););
+               printf("): Not a legal CHAROBJECT.\n"););
       raise_error(RANGE_ERROR);
       return '\0';
     } else {
@@ -1288,23 +1441,23 @@ winType drwValue (const const_objectType aReference)
                        aReference != NULL ? CATEGORY_OF_OBJ(aReference)
                                           : 0););
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != WINOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != WINOBJECT ||
+                 (win_value = take_win(aReference)) == NULL)) {
       logError(printf("drwValue(");
                trace1(aReference);
-               printf("): Category is not WINOBJECT.\n"););
+               printf("): Not a legal WINOBJECT.\n"););
       raise_error(RANGE_ERROR);
-      return NULL;
+      win_value = NULL;
     } else {
-      win_value = take_win(aReference);
-      if (win_value != NULL && win_value->usage_count != 0) {
+      if (win_value->usage_count != 0) {
         win_value->usage_count++;
       } /* if */
-      logFunction(printf("drwValue --> " FMT_U_MEM " (usage=" FMT_U ")\n",
-                         (memSizeType) win_value,
-                         win_value != NULL ? win_value->usage_count
-                                           : (uintType) 0););
-      return win_value;
     } /* if */
+    logFunction(printf("drwValue --> " FMT_U_MEM " (usage=" FMT_U ")\n",
+                       (memSizeType) win_value,
+                       win_value != NULL ? win_value->usage_count
+                                         : (uintType) 0););
+    return win_value;
   } /* drwValue */
 
 
@@ -1317,17 +1470,24 @@ winType drwValue (const const_objectType aReference)
  */
 fileType filValue (const const_objectType aReference)
 
-  { /* filValue */
+  {
+    fileType aFile;
+
+  /* filValue */
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != FILEOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != FILEOBJECT ||
+                 (aFile = take_file(aReference)) == NULL)) {
       logError(printf("filValue(");
                trace1(aReference);
-               printf("): Category is not FILEOBJECT.\n"););
+               printf("): Not a legal FILEOBJECT.\n"););
       raise_error(RANGE_ERROR);
-      return NULL;
+      aFile = NULL;
     } else {
-      return take_file(aReference);
+      if (aFile->usage_count != 0) {
+        aFile->usage_count++;
+      } /* if */
     } /* if */
+    return aFile;
   } /* filValue */
 
 
@@ -1345,7 +1505,7 @@ floatType fltValue (const const_objectType aReference)
                  CATEGORY_OF_OBJ(aReference) != FLOATOBJECT)) {
       logError(printf("fltValue(");
                trace1(aReference);
-               printf("): Category is not FLOATOBJECT.\n"););
+               printf("): Not a legal FLOATOBJECT.\n"););
       raise_error(RANGE_ERROR);
       return 0.0;
     } else {
@@ -1368,7 +1528,7 @@ intType intValue (const const_objectType aReference)
                  CATEGORY_OF_OBJ(aReference) != INTOBJECT)) {
       logError(printf("intValue(");
                trace1(aReference);
-               printf("): Category is not INTOBJECT.\n"););
+               printf("): Not a legal INTOBJECT.\n"););
       raise_error(RANGE_ERROR);
       return 0;
     } else {
@@ -1394,16 +1554,16 @@ processType pcsValue (const const_objectType aReference)
                  CATEGORY_OF_OBJ(aReference) != PROCESSOBJECT)) {
       logError(printf("pcsValue(");
                trace1(aReference);
-               printf("): Category is not PROCESSOBJECT.\n"););
+               printf("): Not a legal PROCESSOBJECT.\n"););
       raise_error(RANGE_ERROR);
-      return NULL;
+      process_value = NULL;
     } else {
       process_value = take_process(aReference);
       if (process_value != NULL) {
         process_value->usage_count++;
       } /* if */
-      return process_value;
     } /* if */
+    return process_value;
   } /* pcsValue */
 
 
@@ -1426,17 +1586,14 @@ bstriType pltValue (const const_objectType aReference)
                  (plist = take_pointlist(aReference)) == NULL)) {
       logError(printf("pltValue(");
                trace1(aReference);
-               printf("): Category is not POINTLISTOBJECT.\n"););
+               printf("): Not a legal POINTLISTOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
+    } else if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, plist->size))) {
+      raise_error(MEMORY_ERROR);
     } else {
-      if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, plist->size))) {
-        raise_error(MEMORY_ERROR);
-      } else {
-        result->size = plist->size;
-        memcpy_size_0_okay(result->mem, plist->mem,
-                           (size_t) (plist->size));
-      } /* if */
+      result->size = plist->size;
+      memcpy(result->mem, plist->mem, (size_t) (plist->size));
     } /* if */
     return result;
   } /* pltValue */
@@ -1451,16 +1608,20 @@ bstriType pltValue (const const_objectType aReference)
  */
 pollType polValue (const const_objectType aReference)
 
-  { /* polValue */
+  {
+    pollType pollData;
+
+  /* polValue */
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != POLLOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != POLLOBJECT ||
+                 (pollData = take_poll(aReference)) == NULL)) {
       logError(printf("polValue(");
                trace1(aReference);
-               printf("): Category is not POLLOBJECT.\n"););
+               printf("): Not a legal POLLOBJECT.\n"););
       raise_error(RANGE_ERROR);
       return NULL;
     } else {
-      return polCreate(take_poll(aReference));
+      return polCreate(pollData);
     } /* if */
   } /* polValue */
 
@@ -1474,17 +1635,24 @@ pollType polValue (const const_objectType aReference)
  */
 progType prgValue (const const_objectType aReference)
 
-  { /* prgValue */
+  {
+    progType aProg;
+
+  /* prgValue */
     if (unlikely(aReference == NULL ||
                  CATEGORY_OF_OBJ(aReference) != PROGOBJECT)) {
       logError(printf("prgValue(");
                trace1(aReference);
-               printf("): Category is not PROGOBJECT.\n"););
+               printf("): Not a legal PROGOBJECT.\n"););
       raise_error(RANGE_ERROR);
-      return NULL;
+      aProg = NULL;
     } else {
-      return take_prog(aReference);
+      aProg = take_prog(aReference);
+      if (aProg != NULL) {
+        aProg->usage_count++;
+      } /* if */
     } /* if */
+    return aProg;
   } /* prgValue */
 
 
@@ -1496,6 +1664,7 @@ objectType refValue (const const_objectType aReference)
                (CATEGORY_OF_OBJ(aReference) == FWDREFOBJECT ||
                 CATEGORY_OF_OBJ(aReference) == REFOBJECT ||
                 CATEGORY_OF_OBJ(aReference) == STRUCTELEMOBJECT ||
+                CATEGORY_OF_OBJ(aReference) == VALUEPARAMOBJECT ||
                 CATEGORY_OF_OBJ(aReference) == REFPARAMOBJECT ||
                 CATEGORY_OF_OBJ(aReference) == RESULTOBJECT ||
                 CATEGORY_OF_OBJ(aReference) == LOCALVOBJECT ||
@@ -1588,7 +1757,7 @@ setType setValue (const const_objectType aReference)
                  (set1 = take_set(aReference)) == NULL)) {
       logError(printf("setValue(");
                trace1(aReference);
-               printf("): Category is not SETOBJECT.\n"););
+               printf("): Not a legal SETOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
@@ -1603,6 +1772,36 @@ setType setValue (const const_objectType aReference)
     } /* if */
     return result;
   } /* setValue */
+
+
+
+/**
+ *  Get 'PRIMITIVE_SOCKET' value of the object referenced by 'aReference'.
+ *  @return the 'PRIMITIVE_SOCKET' value of the referenced object.
+ *  @exception RANGE_ERROR If 'aReference' is NIL or
+ *             category(aReference) <> SOCKETOBJECT holds.
+ */
+socketType socValue (const const_objectType aReference)
+
+  {
+    socketType aSocket;
+
+  /* socValue */
+    if (unlikely(aReference == NULL ||
+                 CATEGORY_OF_OBJ(aReference) != SOCKETOBJECT ||
+                 (aSocket = take_socket(aReference)) == NULL)) {
+      logError(printf("socValue(");
+               trace1(aReference);
+               printf("): Not a legal SOCKETOBJECT.\n"););
+      raise_error(RANGE_ERROR);
+      aSocket = NULL;
+    } else {
+      if (aSocket->usage_count != 0) {
+        aSocket->usage_count++;
+      } /* if */
+    } /* if */
+    return aSocket;
+  } /* socValue */
 
 
 
@@ -1627,17 +1826,15 @@ striType strValue (const const_objectType aReference)
                  (stri = take_stri(aReference)) == NULL)) {
       logError(printf("strValue(");
                trace1(aReference);
-               printf("): Category is not STRIOBJECT.\n"););
+               printf("): Not a legal STRIOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
+    } else if (unlikely(!ALLOC_STRI_SIZE_OK(result, stri->size))) {
+      raise_error(MEMORY_ERROR);
     } else {
-      if (unlikely(!ALLOC_STRI_SIZE_OK(result, stri->size))) {
-        raise_error(MEMORY_ERROR);
-      } else {
-        result->size = stri->size;
-        memcpy(result->mem, stri->mem,
-               (size_t) (result->size * sizeof(strElemType)));
-      } /* if */
+      result->size = stri->size;
+      memcpy(result->mem, stri->mem,
+             (size_t) (result->size * sizeof(strElemType)));
     } /* if */
     logFunction(printf("strValue --> \"%s\"\n",
                        striAsUnquotedCStri(result)););
@@ -1667,7 +1864,7 @@ const_striType strValueRef (const const_objectType aReference)
                  (stri = take_stri(aReference)) == NULL)) {
       logError(printf("strValueRef(");
                trace1(aReference);
-               printf("): Category is not STRIOBJECT.\n"););
+               printf("): Not a legal STRIOBJECT.\n"););
       raise_error(RANGE_ERROR);
       result = NULL;
     } else {
@@ -1689,22 +1886,21 @@ const_striType strValueRef (const const_objectType aReference)
 typeType typValue (const const_objectType aReference)
 
   {
-    typeType result;
+    typeType aType;
 
   /* typValue */
     logFunction(printf("refValue(");
                 trace1(aReference);
                 printf(")\n"););
     if (unlikely(aReference == NULL ||
-                 CATEGORY_OF_OBJ(aReference) != TYPEOBJECT)) {
+                 CATEGORY_OF_OBJ(aReference) != TYPEOBJECT ||
+                 (aType = take_type(aReference)) == NULL)) {
       logError(printf("typValue(");
                trace1(aReference);
-               printf("): Category is not TYPEOBJECT.\n"););
+               printf("): Not a legal TYPEOBJECT.\n"););
       raise_error(RANGE_ERROR);
-      result = NULL;
-    } else {
-      result = take_type(aReference);
+      aType = NULL;
     } /* if */
-    logFunction(printf("typValue --> " FMT_X_MEM "\n", (memSizeType) result););
-    return result;
+    logFunction(printf("typValue --> " FMT_X_MEM "\n", (memSizeType) aType););
+    return aType;
   } /* typValue */

@@ -25,12 +25,14 @@
 /*                                                                  */
 /********************************************************************/
 
-objectType refAlloc (const const_objectType obj1);
 objectType refAllocInt (boolType isVar, typeType aType,
                         const intType number);
+objectType refAllocList (const intType aCategory,
+                         const const_objectType obj1);
+objectType refAllocRef (const intType aCategory,
+                        const const_objectType obj1);
 objectType refAllocStri (boolType isVar, typeType aType,
                          const const_striType stri);
-objectType refAllocVar (typeType aType, const intType aCategory);
 void refAppendParams (objectType funcRef, const_listType params);
 intType refArrMaxIdx (const const_objectType arrayRef);
 intType refArrMinIdx (const const_objectType arrayRef);
@@ -62,7 +64,6 @@ void refSetVar (objectType aReference, boolType var_flag);
 striType refStr (const const_objectType aReference);
 objectType refSymb (const const_objectType aReference);
 typeType refType (const const_objectType aReference);
-actType actValue (const const_objectType aReference);
 bigIntType bigValue (const const_objectType aReference);
 boolType blnValue (const_objectType aReference);
 bstriType bstValue (const const_objectType aReference);
@@ -79,6 +80,7 @@ objectType refValue (const const_objectType aReference);
 listType rflValue (const const_objectType aReference);
 void rflSetValue (objectType dest, listType source);
 setType setValue (const const_objectType aReference);
+socketType socValue (const const_objectType aReference);
 striType strValue (const const_objectType aReference);
 const_striType strValueRef (const const_objectType aReference);
 typeType typValue (const const_objectType aReference);

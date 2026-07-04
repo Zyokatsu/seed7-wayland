@@ -26,6 +26,7 @@
 /********************************************************************/
 
 typedef enum {
+    ILLEGALOBJECT,
     SYMBOLOBJECT,        /* pos (file, line) - Symbol object        */
                          /*                    created by read_atom */
                          /*                    and read_name        */
@@ -60,7 +61,6 @@ typedef enum {
     INTERFACEOBJECT,     /* objValue -    Dynamic Object            */
     SETOBJECT,           /* setValue -    set                       */
     FILEOBJECT,          /* fileValue -   file                      */
-    FILEDESOBJECT,       /* fileDesValue - file descriptor          */
     SOCKETOBJECT,        /* socketValue - socket                    */
     POLLOBJECT,          /* pollValue -   poll list                 */
     LISTOBJECT,          /* listValue -   list                      */
@@ -74,6 +74,7 @@ typedef enum {
     REFOBJECT,           /* objValue -    reference                 */
     REFLISTOBJECT,       /* listValue -   ref_list                  */
     EXPROBJECT,          /* listValue -   expression                */
+    ACTENTRYOBJECT,      /* actEntryValue actionEntry               */
     ACTOBJECT,           /* actValue -    Action                    */
     VALUEPARAMOBJECT,    /* objValue -    Formal value parameter    */
     REFPARAMOBJECT,      /* objValue -    Formal ref parameter      */
@@ -82,7 +83,9 @@ typedef enum {
     DATABASEOBJECT,      /* databaseValue - Database                */
     SQLSTMTOBJECT,       /* sqlStmtValue -  SQL statement           */
     PROGOBJECT,          /* progValue -   Program                   */
-    ILLEGALOBJECT
+    BOOLOBJECT,          /* boolean     - Only used in the compiler */
+    ENUMOBJECT,          /* enumeration - Only used in the compiler */
+    VOIDOBJECT           /* void        - Only used in the compiler */
   } objectCategory;
 
 typedef enum {
@@ -141,6 +144,17 @@ typedef const struct progStruct       *const_progType;
 typedef const struct inFileStruct     *const_inFileType;
 
 typedef objectType (*actType) (listType);
+
+typedef struct {
+    const_cstriType name;
+    actType action;
+    objectCategory resultCategory;
+    unsigned int numParams;
+    const objectCategory *const paramCategories;
+  } actEntryRecord;
+
+typedef actEntryRecord *actEntryType;
+typedef const actEntryRecord *const_actEntryType;
 
 typedef struct identStruct {
     ustriType name;
@@ -213,7 +227,6 @@ typedef union {
     structType   structValue;   /* STRUCTOBJECT */
     uintType     binaryValue;   /* INTOBJECT */
     fileType     fileValue;     /* FILEOBJECT */
-    fileDesType  fileDesValue;  /* FILEDESOBJECT */
     socketType   socketValue;   /* SOCKETOBJECT */
     pollType     pollValue;     /* POLLOBJECT */
     listType     listValue;     /* LISTOBJECT, EXPROBJECT */
@@ -225,6 +238,7 @@ typedef union {
                                 /* LOCALVOBJECT, FORMPARAMOBJECT */
                                 /* INTERFACEOBJECT */
     blockType    blockValue;    /* BLOCKOBJECT */
+    const_actEntryType actEntryValue; /* ACTENTRYOBJECT */
     actType      actValue;      /* ACTOBJECT */
     databaseType databaseValue; /* DATABASEOBJECT */
     sqlStmtType  sqlStmtValue;  /* SQLSTMTOBJECT */
@@ -276,6 +290,7 @@ typedef struct typeStruct {
     boolType is_varfunc_type;
     boolType is_type_type;
     parameterType in_param_type;
+    objectCategory value_category;
     listType interfaces;
     identType name;
     progType owningProg;
@@ -464,7 +479,6 @@ typedef struct progStruct {
     listType when_value_objects;
     listType when_set_objects;
     listType match_expr_objects;
-    listType allocated_objects;
   } progRecord;
 
 typedef struct inFileStruct {

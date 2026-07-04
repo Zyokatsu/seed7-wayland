@@ -364,6 +364,12 @@ const func string: decodeHtmlEntities (in string: stri) is func
           decoded &:= stri[old_pos .. pred(new_pos)];
           decoded &:= str(charValue);
           old_pos := succ(semicol_pos);
+        elsif length(entityName) >= 3 and entityName[1 fixLen 2] = "#x" and
+            isDigitString(entityName[3 ..], 16) then
+          charValue := char(integer(entityName[3 ..], 16));
+          decoded &:= stri[old_pos .. pred(new_pos)];
+          decoded &:= str(charValue);
+          old_pos := succ(semicol_pos);
         elsif entityName in htmlEntityHash then
           charValue := htmlEntityHash[entityName];
           decoded &:= stri[old_pos .. pred(new_pos)];

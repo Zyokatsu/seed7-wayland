@@ -25,10 +25,10 @@
 /*                                                                  */
 /********************************************************************/
 
-objectType ref_alloc         (listType arguments);
 objectType ref_alloc_int     (listType arguments);
+objectType ref_alloc_list    (listType arguments);
+objectType ref_alloc_ref     (listType arguments);
 objectType ref_alloc_stri    (listType arguments);
-objectType ref_alloc_var     (listType arguments);
 objectType ref_append_params (listType arguments);
 objectType ref_arrmaxidx     (listType arguments);
 objectType ref_arrminidx     (listType arguments);
@@ -63,7 +63,6 @@ objectType ref_path          (listType arguments);
 objectType ref_resini        (listType arguments);
 objectType ref_result        (listType arguments);
 objectType ref_scttolist     (listType arguments);
-objectType ref_select        (listType arguments);
 objectType ref_setcategory   (listType arguments);
 objectType ref_setparams     (listType arguments);
 objectType ref_settype       (listType arguments);

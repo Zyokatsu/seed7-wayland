@@ -25,6 +25,9 @@
 /*                                                                  */
 /********************************************************************/
 
+#define LOG_FUNCTIONS 0
+#define VERBOSE_EXCEPTIONS 0
+
 #include "version.h"
 
 #include "stdio.h"
@@ -109,6 +112,18 @@ objectType sql_bind_duration (listType arguments)
     isit_int(arg_7(arguments));
     isit_int(arg_8(arguments));
     isit_int(arg_9(arguments));
+    logFunction(printf("sql_bind_duration(" FMT_U_MEM ", " FMT_D
+                       ", " FMT_D ", " FMT_D ", " FMT_D ", " FMT_D
+                       ", " FMT_D ", " FMT_D ", " FMT_D ")\n",
+                       (memSizeType) take_sqlstmt(arg_1(arguments)),
+                       take_int(arg_2(arguments)),
+                       take_int(arg_3(arguments)),
+                       take_int(arg_4(arguments)),
+                       take_int(arg_5(arguments)),
+                       take_int(arg_6(arguments)),
+                       take_int(arg_7(arguments)),
+                       take_int(arg_8(arguments)),
+                       take_int(arg_9(arguments))););
     sqlBindDuration(take_sqlstmt(arg_1(arguments)),
                     take_int(arg_2(arguments)),
                     take_int(arg_3(arguments)),
@@ -205,37 +220,6 @@ objectType sql_bind_time (listType arguments)
 
 
 
-objectType sql_column_bigint (listType arguments)
-
-  {
-    bigIntType number;
-
-  /* sql_column_bigint */
-    isit_sqlstmt(arg_1(arguments));
-    isit_int(arg_2(arguments));
-    number = sqlColumnBigInt(take_sqlstmt(arg_1(arguments)),
-                             take_int(arg_2(arguments)));
-    return bld_bigint_temp(number);
-  } /* sql_column_bigint */
-
-
-
-objectType sql_column_bigrat (listType arguments)
-
-  { /* sql_column_bigrat */
-    isit_sqlstmt(arg_1(arguments));
-    isit_int(arg_2(arguments));
-    isit_bigint(arg_3(arguments));
-    isit_bigint(arg_4(arguments));
-    sqlColumnBigRat(take_sqlstmt(arg_1(arguments)),
-                    take_int(arg_2(arguments)),
-                    &arg_3(arguments)->value.bigIntValue,
-                    &arg_4(arguments)->value.bigIntValue);
-    return SYS_EMPTY_OBJECT;
-  } /* sql_column_bigrat */
-
-
-
 objectType sql_close (listType arguments)
 
   { /* sql_close */
@@ -294,6 +278,37 @@ objectType sql_cmp_stmt (listType arguments)
 
 
 
+objectType sql_column_bigint (listType arguments)
+
+  {
+    bigIntType number;
+
+  /* sql_column_bigint */
+    isit_sqlstmt(arg_1(arguments));
+    isit_int(arg_2(arguments));
+    number = sqlColumnBigInt(take_sqlstmt(arg_1(arguments)),
+                             take_int(arg_2(arguments)));
+    return bld_bigint_temp(number);
+  } /* sql_column_bigint */
+
+
+
+objectType sql_column_bigrat (listType arguments)
+
+  { /* sql_column_bigrat */
+    isit_sqlstmt(arg_1(arguments));
+    isit_int(arg_2(arguments));
+    isit_bigint(arg_3(arguments));
+    isit_bigint(arg_4(arguments));
+    sqlColumnBigRat(take_sqlstmt(arg_1(arguments)),
+                    take_int(arg_2(arguments)),
+                    &arg_3(arguments)->value.bigIntValue,
+                    &arg_4(arguments)->value.bigIntValue);
+    return SYS_EMPTY_OBJECT;
+  } /* sql_column_bigrat */
+
+
+
 objectType sql_column_bool (listType arguments)
 
   { /* sql_column_bool */
@@ -345,6 +360,18 @@ objectType sql_column_duration (listType arguments)
                       &arg_7(arguments)->value.intValue,
                       &arg_8(arguments)->value.intValue,
                       &arg_9(arguments)->value.intValue);
+    logFunction(printf("sql_column_duration(" FMT_U_MEM ", " FMT_D
+                       ", " FMT_D ", " FMT_D ", " FMT_D ", " FMT_D
+                       ", " FMT_D ", " FMT_D ", " FMT_D ") -->\n",
+                       (memSizeType) take_sqlstmt(arg_1(arguments)),
+                       take_int(arg_2(arguments)),
+                       take_int(arg_3(arguments)),
+                       take_int(arg_4(arguments)),
+                       take_int(arg_5(arguments)),
+                       take_int(arg_6(arguments)),
+                       take_int(arg_7(arguments)),
+                       take_int(arg_8(arguments)),
+                       take_int(arg_9(arguments))););
     return SYS_EMPTY_OBJECT;
   } /* sql_column_duration */
 

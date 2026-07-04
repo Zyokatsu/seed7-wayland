@@ -125,6 +125,7 @@ const func category: (attr category) parse (in string: catName) is
     return category(catName);
 
 
+const category: ILLEGALOBJECT     is category("ILLEGALOBJECT");
 const category: SYMBOLOBJECT      is category("SYMBOLOBJECT");
 const category: DECLAREDOBJECT    is category("DECLAREDOBJECT");
 const category: FORWARDOBJECT     is category("FORWARDOBJECT");
@@ -161,6 +162,7 @@ const category: VARENUMOBJECT     is category("VARENUMOBJECT");
 const category: REFOBJECT         is category("REFOBJECT");
 const category: REFLISTOBJECT     is category("REFLISTOBJECT");
 const category: EXPROBJECT        is category("EXPROBJECT");
+const category: ACTENTRYOBJECT    is category("ACTENTRYOBJECT");
 const category: ACTOBJECT         is category("ACTOBJECT");
 const category: VALUEPARAMOBJECT  is category("VALUEPARAMOBJECT");
 const category: REFPARAMOBJECT    is category("REFPARAMOBJECT");
@@ -169,7 +171,9 @@ const category: LOCALVOBJECT      is category("LOCALVOBJECT");
 const category: DATABASEOBJECT    is category("DATABASEOBJECT");
 const category: SQLSTMTOBJECT     is category("SQLSTMTOBJECT");
 const category: PROGOBJECT        is category("PROGOBJECT");
-const category: ILLEGALOBJECT     is category("ILLEGALOBJECT");
+const category: BOOLOBJECT        is category("BOOLOBJECT");
+const category: ENUMOBJECT        is category("ENUMOBJECT");
+const category: VOIDOBJECT        is category("VOIDOBJECT");
 
 
 (**

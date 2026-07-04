@@ -66,6 +66,14 @@ static objectType toIntArray (rtlArrayType aRtlArray)
     objectType result;
 
   /* toIntArray */
+    logFunction(printf("toIntArray(");
+                if (aRtlArray == NULL) {
+                  printf("NULL)\n");
+                } else {
+                  printf("array[" FMT_D " .. " FMT_D "])\n",
+                         aRtlArray->min_position,
+                         aRtlArray->max_position);
+                });
     if (aRtlArray == NULL) {
       /* Assume that an exception was already raised */
       result = NULL;
@@ -87,6 +95,9 @@ static objectType toIntArray (rtlArrayType aRtlArray)
         result = bld_array_temp(anArray);
       } /* if */
     } /* if */
+    logFunction(printf("toIntArray --> ");
+                trace1(result);
+                printf("\n"););
     return result;
   } /* toIntArray */
 
@@ -1335,29 +1346,13 @@ objectType drw_put_scaled (listType arguments)
 
 
 
-objectType drw_rgbcol (listType arguments)
+objectType drw_rgb_color (listType arguments)
 
-  { /* drw_rgbcol */
+  { /* drw_rgb_color */
     return bld_int_temp(
         drwRgbColor(take_int(arg_1(arguments)), take_int(arg_2(arguments)),
                     take_int(arg_3(arguments))));
-  } /* drw_rgbcol */
-
-
-
-objectType drw_rot (listType arguments)
-
-  { /* drw_rot */
-    return SYS_EMPTY_OBJECT;
-  } /* drw_rot */
-
-
-
-objectType drw_scale (listType arguments)
-
-  { /* drw_scale */
-    return SYS_EMPTY_OBJECT;
-  } /* drw_scale */
+  } /* drw_rgb_color */
 
 
 
@@ -1398,7 +1393,7 @@ objectType drw_set_content (listType arguments)
  *  Set the visibility of the mouse cursor in aWindow/arg_1.
  *  @param aWindow/arg_1 Window for which the mouse cursor visibility is set.
  *  @param visible/arg_2 TRUE, if the mouse cursor should be visible, or
- *                       FALSE, if the mouse curser should be invisible.
+ *                       FALSE, if the mouse cursor should be invisible.
  */
 objectType drw_set_cursor_visible (listType arguments)
 
@@ -1554,14 +1549,14 @@ objectType drw_value (listType arguments)
                        obj_arg != NULL ? CATEGORY_OF_OBJ(obj_arg)
                                        : 0););
     if (unlikely(obj_arg == NULL ||
-                 CATEGORY_OF_OBJ(obj_arg) != WINOBJECT)) {
+                 CATEGORY_OF_OBJ(obj_arg) != WINOBJECT ||
+                 (win_value = take_win(obj_arg)) == NULL)) {
       logError(printf("drw_value(");
                trace1(obj_arg);
-               printf("): Category is not WINOBJECT.\n"););
+               printf("): Not a legal WINOBJECT.\n"););
       return raise_exception(SYS_RNG_EXCEPTION);
     } else {
-      win_value = take_win(obj_arg);
-      if (win_value != NULL && win_value->usage_count != 0) {
+      if (win_value->usage_count != 0) {
         win_value->usage_count++;
       } /* if */
       logFunction(printf("drw_value --> " FMT_U_MEM " (usage=" FMT_U ")\n",
@@ -1640,8 +1635,7 @@ objectType plt_bstring (listType arguments)
         return raise_exception(SYS_MEM_EXCEPTION);
       } else {
         result->size = plist->size;
-        memcpy_size_0_okay(result->mem, plist->mem,
-                           (size_t) plist->size);
+        memcpy(result->mem, plist->mem, (size_t) plist->size);
       } /* if */
     } /* if */
     logFunction(printf("plt_bstring --> \"%s\"\n",
@@ -1744,8 +1738,8 @@ objectType plt_create (listType arguments)
       } /* if */
       dest->value.bstriValue = new_plist;
       new_plist->size = new_size;
-      memcpy_size_0_okay(new_plist->mem, take_pointlist(source)->mem,
-                         (size_t) new_size);
+      memcpy(new_plist->mem, take_pointlist(source)->mem,
+             (size_t) new_size);
     } /* if */
     return SYS_EMPTY_OBJECT;
   } /* plt_create */
@@ -1888,8 +1882,7 @@ objectType plt_point_list (listType arguments)
         return raise_exception(SYS_MEM_EXCEPTION);
       } else {
         result->size = bstri->size;
-        memcpy_size_0_okay(result->mem, bstri->mem,
-                           (size_t) bstri->size);
+        memcpy(result->mem, bstri->mem, (size_t) bstri->size);
       } /* if */
     } /* if */
     logFunction(printf("plt_point_list --> \"%s\"\n",
@@ -1918,21 +1911,17 @@ objectType plt_value (listType arguments)
     aReference = take_reference(arg_1(arguments));
     if (unlikely(aReference == NULL ||
                  CATEGORY_OF_OBJ(aReference) != POINTLISTOBJECT ||
-                 take_pointlist(aReference) == NULL)) {
+                 (plist = take_pointlist(aReference)) == NULL)) {
       logError(printf("plt_value(");
                trace1(aReference);
-               printf("): Category is not POINTLISTOBJECT.\n"););
+               printf("): Not a legal POINTLISTOBJECT.\n"););
       return raise_exception(SYS_RNG_EXCEPTION);
+    } else if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, plist->size))) {
+      return raise_exception(SYS_MEM_EXCEPTION);
     } else {
-      plist = take_pointlist(aReference);
-      if (unlikely(!ALLOC_BSTRI_SIZE_OK(result, plist->size))) {
-        return raise_exception(SYS_MEM_EXCEPTION);
-      } else {
-        result->size = plist->size;
-        memcpy_size_0_okay(result->mem, plist->mem,
-                           (size_t) plist->size);
-        logFunction(printf("plt_value -->\n"););
-        return bld_pointlist_temp(result);
-      } /* if */
+      result->size = plist->size;
+      memcpy(result->mem, plist->mem, (size_t) plist->size);
+      logFunction(printf("plt_value -->\n"););
+      return bld_pointlist_temp(result);
     } /* if */
   } /* plt_value */

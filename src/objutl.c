@@ -55,6 +55,7 @@
 #include "pcs_drv.h"
 #include "pol_drv.h"
 #include "fil_rtl.h"
+#include "soc_rtl.h"
 #if WITH_SQL
 #include "sql_rtl.h"
 #endif
@@ -103,18 +104,26 @@ void isit_enum (objectType argument)
       category_required(CONSTENUMOBJECT, argument);
     } /* if */
   } /* isit_enum */
-
-
-
-void isit_list (objectType argument)
-
-  { /* isit_list */
-    if (CATEGORY_OF_OBJ(argument) != LISTOBJECT &&
-        CATEGORY_OF_OBJ(argument) != EXPROBJECT) {
-      category_required(LISTOBJECT, argument);
-    } /* if */
-  } /* isit_list */
 #endif
+
+
+
+objectType bld_actentry_temp (const_actEntryType temp_actentry)
+
+  {
+    register objectType result;
+
+  /* bld_actentry_temp */
+    if (ALLOC_OBJECT(result)) {
+      result->type_of = NULL;
+      result->descriptor.property = NULL;
+      INIT_CATEGORY_OF_TEMP(result, ACTENTRYOBJECT);
+      result->value.actEntryValue = temp_actentry;
+      return result;
+    } else {
+      return raise_exception(SYS_MEM_EXCEPTION);
+    } /* if */
+  } /* bld_actentry_temp */
 
 
 
@@ -381,25 +390,6 @@ objectType bld_int_temp (intType temp_int)
       return raise_exception(SYS_MEM_EXCEPTION);
     } /* if */
   } /* bld_int_temp */
-
-
-
-objectType bld_list_temp (listType temp_list)
-
-  {
-    register objectType result;
-
-  /* bld_list_temp */
-    if (ALLOC_OBJECT(result)) {
-      result->type_of = NULL;
-      result->descriptor.property = NULL;
-      INIT_CATEGORY_OF_TEMP(result, LISTOBJECT);
-      result->value.listValue = temp_list;
-      return result;
-    } else {
-      return raise_exception(SYS_MEM_EXCEPTION);
-    } /* if */
-  } /* bld_list_temp */
 
 
 
@@ -681,6 +671,129 @@ objectType bld_process_temp (processType temp_process)
 
 
 
+#if CLOSE_ALL_GLOBAL_OBJECTS
+static void closeObject (objectType currentObject)
+
+  {
+    fileType aFile;
+    socketType aSocket;
+    databaseType aDatabase;
+    structType aStruct;
+    arrayType anArray;
+    memSizeType size;
+    memSizeType idx;
+
+  /* closeObject */
+    switch (CATEGORY_OF_OBJ(currentObject)) {
+      case FILEOBJECT:
+        aFile = take_file(currentObject);
+        if (aFile != NULL && aFile->cFile != NULL &&
+            aFile->usage_count != 0) {
+          logMessage(printf("closeObject(");
+                     trace1(currentObject);
+                     printf(")\n"););
+          filClose(aFile);
+        } /* if */
+        break;
+      case SOCKETOBJECT:
+        aSocket = take_socket(currentObject);
+        if (aSocket != NULL &&
+            aSocket->socketNumber != EMPTY_SOCKET &&
+            aSocket->usage_count != 0) {
+          logMessage(printf("closeObject(");
+                     trace1(currentObject);
+                     printf(")\n"););
+          socClose(aSocket);
+        } /* if */
+        break;
+      case DATABASEOBJECT:
+        aDatabase = take_database(currentObject);
+        if (aDatabase != NULL && aDatabase->isOpen &&
+            aDatabase->usage_count != 0) {
+          logMessage(printf("closeObject(");
+                     trace1(currentObject);
+                     printf(")\n"););
+          sqlClose(aDatabase);
+        } /* if */
+        break;
+      case STRUCTOBJECT:
+        logMessage(printf("closeObject(");
+                   trace1(currentObject);
+                   printf(")\n"););
+        aStruct = take_struct(currentObject);
+        if (aStruct != NULL) {
+          idx = 0;
+          while (idx < aStruct->size) {
+            closeObject(&aStruct->stru[idx]);
+            idx++;
+          } /* while */
+        } /* if */
+        break;
+      case INTERFACEOBJECT:
+        logMessage(printf("closeObject(");
+                   trace1(currentObject);
+                   printf(")\n"););
+        if (currentObject->value.objValue != NULL) {
+          closeObject(currentObject->value.objValue);
+        } /* if */
+        break;
+      case ARRAYOBJECT:
+        logMessage(printf("closeObject(");
+                   trace1(currentObject);
+                   printf(")\n"););
+        anArray = take_array(currentObject);
+        if (anArray != NULL) {
+          size = arraySize(anArray);
+          idx = 0;
+          while (idx < size) {
+            closeObject(&anArray->arr[idx]);
+            idx++;
+          } /* while */
+        } /* while */
+        break;
+      default:
+        /* do nothing */
+        break;
+    } /* switch */
+  } /* closeObject */
+
+
+
+/**
+ *  Explicitly close global files, sockets and database connections.
+ *  Normally the C run-time closes these things at program termination.
+ *  This function explicitly invokes the corresponding close functions.
+ *  This functions closes global objects without freeing them.
+ *  This way it is faster than prgDestr() which closes and frees all
+ *  objects from aProgram. This function searches for files, sockets
+ *  and database connections in structs and arrays. In hash tables no
+ *  search takes place. Note that local files, sockets and database
+ *  connections are closed by destroyers when they become unreachable.
+ */
+void closeAllGlobalObjects (const const_progType aProgram)
+
+  {
+    listType listElement;
+    objectType currentObject;
+
+  /* closeAllGlobalObjects */
+    logFunction(printf("closeAllGlobalObjects(" FMT_X_MEM ")\n",
+                       (memSizeType) aProgram););
+    if (aProgram != NULL && aProgram->stack_current != NULL) {
+      listElement = aProgram->stack_global->local_object_list;
+      while (listElement != NULL) {
+        currentObject = listElement->obj;
+        if (currentObject != NULL) {
+          closeObject(currentObject);
+        } /* if */
+        listElement = listElement->next;
+      } /* while */
+    } /* if */
+  } /* closeAllGlobalObjects */
+#endif
+
+
+
 void dump_temp_value (objectType object)
 
   {
@@ -705,10 +818,10 @@ void dump_temp_value (objectType object)
     switch (CATEGORY_OF_OBJ(object)) {
       case INTOBJECT:
       case CHAROBJECT:
-      case SOCKETOBJECT:
       case FLOATOBJECT:
       case REFOBJECT:
       case STRUCTELEMOBJECT:
+      case ACTENTRYOBJECT:
       case ACTOBJECT:
       case CONSTENUMOBJECT:
       case VARENUMOBJECT:
@@ -722,6 +835,10 @@ void dump_temp_value (objectType object)
         break;
       case FILEOBJECT:
         filDestr(object->value.fileValue);
+        SET_UNUSED_FLAG(object);
+        break;
+      case SOCKETOBJECT:
+        socDestr(object->value.socketValue);
         SET_UNUSED_FLAG(object);
         break;
       case BIGINTOBJECT:

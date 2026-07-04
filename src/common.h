@@ -53,10 +53,12 @@ typedef BOOLTYPE boolType;
 
 #define EXTERN          extern
 
-#if MEMCPY_ZERO_BYTES_DOES_NOTHING
-#define memcpy_size_0_okay(dest, source, size) memcpy(dest, source, size)
-#else
-#define memcpy_size_0_okay(dest, source, size) if ((size) != 0) {memcpy(dest, source, size);}
+#if !MEMCPY_ZERO_BYTES_DOES_NOTHING
+#define memcpy(dest, source, size) ((size) != 0 ? memcpy(dest, source, size) : dest)
+#endif
+
+#if !MEMCMP_WITH_SIZE_0_RETURNS_0
+#define memcmp(mem1, mem2, size) ((size) != 0 ? memcmp(mem1, mem2, size) : 0)
 #endif
 
 
@@ -545,7 +547,6 @@ typedef char              *cstriType;
 typedef unsigned char     *ustriType;
 typedef memSizeType        sySizeType;
 typedef FILE              *cFileType;
-typedef int                fileDesType;
 
 typedef uint16Type           utf16charType;
 typedef utf16charType       *utf16striType;
@@ -555,13 +556,15 @@ typedef uint32Type           utf32charType;
 typedef utf32charType       *utf32striType;
 typedef const utf32charType *const_utf32striType;
 
-typedef int                socketType;
+typedef int                socketNumberType;
 typedef unsigned int       usocketType;
 
 /* Possible values for SOCKET_LIB: */
 #define NO_SOCKETS      (-1)
 #define UNIX_SOCKETS      1
 #define WINSOCK_SOCKETS   2
+
+#define EMPTY_SOCKET (-1)
 
 #if SOCKET_LIB == UNIX_SOCKETS
 typedef int                os_socketType;
@@ -652,10 +655,21 @@ boolType findTermDll (void);
 #define bitsetIndex(set,pos) (memSizeType) ((uintType) (pos) - (uintType) (set)->min_position)
 
 
+/* Functions always create non-NULL fileType values. NULL is */
+/* only used if an exception has been raised. In this case   */
+/* exception handling takes place and no function with a     */
+/* fileType parameter will be called. This way functions     */
+/* with a fileType parameter can assume that the fileType    */
+/* value is never NULL. The macro below is used to state     */
+/* that a fileType parameter is not NULL.                    */
+#define assert_file_not_null(aFile)
+
+
 typedef struct setStruct      *setType;
 typedef struct striStruct     *striType;
 typedef struct bstriStruct    *bstriType;
 typedef struct fileStruct     *fileType;
+typedef struct socketStruct   *socketType;
 typedef struct pollStruct     *pollType;
 typedef struct winStruct      *winType;
 typedef struct processStruct  *processType;
@@ -666,6 +680,7 @@ typedef const struct setStruct      *const_setType;
 typedef const struct striStruct     *const_striType;
 typedef const struct bstriStruct    *const_bstriType;
 typedef const struct fileStruct     *const_fileType;
+typedef const struct socketStruct   *const_socketType;
 typedef const struct pollStruct     *const_pollType;
 typedef const struct winStruct      *const_winType;
 typedef const struct processStruct  *const_processType;
@@ -698,6 +713,9 @@ typedef struct emptyStriStruct {
 #if WITH_STRI_CAPACITY
     memSizeType capacity;
 #endif
+#if ALLOW_STRITYPE_SLICES
+    strElemType *mem;
+#endif
   } emptyStriRecord;
 
 typedef struct bstriStruct {
@@ -714,6 +732,9 @@ typedef struct emptyBStriStruct *emptyBStriType;
 
 typedef struct emptyBStriStruct {
     memSizeType size;
+#if ALLOW_BSTRITYPE_SLICES
+    ucharType *mem;
+#endif
   } emptyBStriRecord;
 
 typedef struct fileStruct {
@@ -721,7 +742,13 @@ typedef struct fileStruct {
     uintType usage_count;
     boolType readingAllowed;
     boolType writingAllowed;
+    boolType isPopenPipe;
   } fileRecord;
+
+typedef struct socketStruct {
+    socketNumberType socketNumber;
+    uintType usage_count;
+  } socketRecord;
 
 typedef struct pollStruct {
 #if !EMPTY_STRUCTS_ALLOWED
@@ -819,7 +846,7 @@ typedef mpz_srcptr  const_bigIntType;
 /* The logging infrastructure uses the following definitions:
      #define LOG_FUNCTIONS 0
      #define VERBOSE_EXCEPTIONS 0
-   These values must be definied at the beginning of a source file.
+   These values must be defined at the beginning of a source file.
    Possible values are:
      0 The logging is deactivated
      1 The logging is activated

@@ -27,6 +27,7 @@ $ include "seed7_05.s7i";
   include "stdio.s7i";
   include "osfiles.s7i";
   include "process.s7i";
+  include "shell.s7i";
   include "scanstri.s7i";
   include "cc_conf.s7i";
 
@@ -222,7 +223,7 @@ const string: chkbst_output is "\n\
   \Bstring assignment works correctly.\n\
   \Bstring append works correctly.\n\
   \Bstring comparisons work correctly.\n\
-  \String indices work correctly.\n\
+  \Bstring indices work correctly.\n\
   \The ternary operator ? : works correctly for bstring.\n";
 
 const string: chkarr_output is "\n\
@@ -259,11 +260,17 @@ const string: chkprc_output is "\n\
   \For boolean to statements work correctly.\n\
   \For boolean downto statements work correctly.\n\
   \For bigInteger statements work correctly.\n\
+  \Case boolean statements work correctly.\n\
   \Case integer statements work correctly.\n\
+  \Case enumeration statements work correctly.\n\
   \Case char statements work correctly.\n\
   \Case string statements work correctly.\n\
+  \Case bstring statements work correctly.\n\
   \Case bigInteger statements work correctly.\n\
-  \Case float statements work correctly.\n";
+  \Case float statements work correctly.\n\
+  \Case rational statements work correctly.\n\
+  \Case bitset statements work correctly.\n\
+  \Case type statements work correctly.\n";
 
 const string: chkbig_output is "\n\
   \Based bigInteger literals work correctly.\n\
@@ -356,6 +363,11 @@ const string: chktime_output is "\n\
   \Week date functions work correctly.\n\
   \await accepts only legal time values.\n\
   \setLocalTZ accepts only legal time values.\n";
+
+const string: chkdecl_output is "\n\
+  \Local variables work correctly.\n\
+  \Parameters work correctly.\n\
+  \Recursive local variables work correctly.\n";
 
 const string: chkscan_output is "\n\
   \The function getDigits works correctly.\n\
@@ -488,6 +500,7 @@ const string: chkerr_output is "\n\
   \All errors are reported correctly.\n";
 
 const string: chkexc_output is "\n\
+  \Exception ord function and conv operator work correctly.\n\
   \Integer exceptions work correctly.\n\
   \BigInteger exceptions work correctly.\n\
   \Floating point exceptions work correctly.\n\
@@ -569,6 +582,9 @@ const func string: cmdOutput (in var string: cmdAndParams) is func
       parameters &:= parameter;
       parameter := getCommandLineWord(cmdAndParams);
     end while;
+    if length(parameter) <> 0 then
+      parameters[length(parameter)] := toOsPath(parameters[length(parameter)]);
+    end if;
     if succeeds(aProcess := startPipe(commandPath(command), parameters)) then
       childStdout := childStdOut(aProcess);
       output := gets(childStdout, 999999999);
@@ -626,29 +642,29 @@ const func boolean: checkCompiler (in string: progName, in string: option,
     else
       writeln;
       writeln(" *** The interpreted compiler was not able to compile " <& progName);
-      if fileType("tmp_" & progName & ".cerrs") = FILE_REGULAR then
+      if fileType(ccConf.TEMP_FILE_PREFIX & progName & ".cerrs") = FILE_REGULAR then
         if fileType("tmp1_" & progName & ".c") = FILE_REGULAR then
           removeFile("tmp1_" & progName & ".c");
         end if;
-        moveFile("tmp_" & progName & ".c", "tmp1_" & progName & ".c");
+        moveFile(ccConf.TEMP_FILE_PREFIX & progName & ".c", "tmp1_" & progName & ".c");
         if fileType("tmp1_" & progName & ".cerrs") = FILE_REGULAR then
           removeFile("tmp1_" & progName & ".cerrs");
         end if;
-        moveFile("tmp_" & progName & ".cerrs", "tmp1_" & progName & ".cerrs");
+        moveFile(ccConf.TEMP_FILE_PREFIX & progName & ".cerrs", "tmp1_" & progName & ".cerrs");
         writeln(" *** Errors in " <& literal("tmp1_" & progName & ".c") <&
                 " - see " <& literal("tmp1_" & progName & ".cerrs"));
-      elsif fileType("tmp_" & progName & ".lerrs") = FILE_REGULAR then
+      elsif fileType(ccConf.TEMP_FILE_PREFIX & progName & ".lerrs") = FILE_REGULAR then
         if fileType("tmp1_" & progName & ccConf.OBJECT_FILE_EXTENSION) = FILE_REGULAR then
           removeFile("tmp1_" & progName & ccConf.OBJECT_FILE_EXTENSION);
         end if;
-        if fileType("tmp_" & progName & ccConf.OBJECT_FILE_EXTENSION) = FILE_REGULAR then
-          moveFile("tmp_" & progName & ccConf.OBJECT_FILE_EXTENSION,
+        if fileType(ccConf.TEMP_FILE_PREFIX & progName & ccConf.OBJECT_FILE_EXTENSION) = FILE_REGULAR then
+          moveFile(ccConf.TEMP_FILE_PREFIX & progName & ccConf.OBJECT_FILE_EXTENSION,
                    "tmp1_" & progName & ccConf.OBJECT_FILE_EXTENSION);
         end if;
         if fileType("tmp1_" & progName & ".lerrs") = FILE_REGULAR then
           removeFile("tmp1_" & progName & ".lerrs");
         end if;
-        moveFile("tmp_" & progName & ".lerrs", "tmp1_" & progName & ".lerrs");
+        moveFile(ccConf.TEMP_FILE_PREFIX & progName & ".lerrs", "tmp1_" & progName & ".lerrs");
         writeln(" *** Linker errors with " <&
                 literal("tmp1_" & progName & ccConf.OBJECT_FILE_EXTENSION) <&
                 " - see " <& literal("tmp1_" & progName & ".lerrs"));
@@ -659,11 +675,11 @@ const func boolean: checkCompiler (in string: progName, in string: option,
       okay := FALSE;
     end if;
     if fileType(s7compiler) = FILE_REGULAR then
-      if fileType("tmp_" & progName & ".c") = FILE_REGULAR then
+      if fileType(ccConf.TEMP_FILE_PREFIX & progName & ".c") = FILE_REGULAR then
         if fileType("tmp1_" & progName & ".c") = FILE_REGULAR then
           removeFile("tmp1_" & progName & ".c");
         end if;
-        moveFile("tmp_" & progName & ".c", "tmp1_" & progName & ".c");
+        moveFile(ccConf.TEMP_FILE_PREFIX & progName & ".c", "tmp1_" & progName & ".c");
       end if;
       if fileType(progName & ccConf.EXECUTABLE_FILE_EXTENSION) <> FILE_ABSENT then
         ignoreFileError(removeFile(progName & ccConf.EXECUTABLE_FILE_EXTENSION));
@@ -671,7 +687,7 @@ const func boolean: checkCompiler (in string: progName, in string: option,
       compilerOutput := cmdOutput(executeCompiler & option & progName);
       if fileType(progName & ccConf.EXECUTABLE_FILE_EXTENSION) = FILE_REGULAR then
         if fileType("tmp1_" & progName & ".c") = FILE_REGULAR then
-          if not equalFiles("tmp_" & progName & ".c", "tmp1_" & progName & ".c") then
+          if not equalFiles(ccConf.TEMP_FILE_PREFIX & progName & ".c", "tmp1_" & progName & ".c") then
             compiledOutput := cmdOutput("./" & progName);
             if compiledOutput <> referenceOutput then
               writeln;
@@ -685,10 +701,10 @@ const func boolean: checkCompiler (in string: progName, in string: option,
               flush(OUT);
             end if;
           else
-            removeFile("tmp_" & progName & ".c");
+            removeFile(ccConf.TEMP_FILE_PREFIX & progName & ".c");
             removeFile("tmp1_" & progName & ".c");
-            if fileType("tmp_" & progName & ccConf.OBJECT_FILE_EXTENSION) <> FILE_ABSENT then
-              ignoreFileError(removeFile("tmp_" & progName & ccConf.OBJECT_FILE_EXTENSION));
+            if fileType(ccConf.TEMP_FILE_PREFIX & progName & ccConf.OBJECT_FILE_EXTENSION) <> FILE_ABSENT then
+              ignoreFileError(removeFile(ccConf.TEMP_FILE_PREFIX & progName & ccConf.OBJECT_FILE_EXTENSION));
             end if;
             if fileType(progName & ccConf.EXECUTABLE_FILE_EXTENSION) <> FILE_ABSENT then
               ignoreFileError(removeFile(progName & ccConf.EXECUTABLE_FILE_EXTENSION));
@@ -700,13 +716,13 @@ const func boolean: checkCompiler (in string: progName, in string: option,
       else
         writeln;
         writeln(" *** The compiled compiler was not able to compile " <& progName);
-        if fileType("tmp_" & progName & ".cerrs") = FILE_REGULAR then
-          writeln(" *** Errors in " <& literal("tmp_" & progName & ".c") <&
-              " - see " <& literal("tmp_" & progName & ".cerrs"));
-        elsif fileType("tmp_" & progName & ".lerrs") = FILE_REGULAR then
+        if fileType(ccConf.TEMP_FILE_PREFIX & progName & ".cerrs") = FILE_REGULAR then
+          writeln(" *** Errors in " <& literal(ccConf.TEMP_FILE_PREFIX & progName & ".c") <&
+              " - see " <& literal(ccConf.TEMP_FILE_PREFIX & progName & ".cerrs"));
+        elsif fileType(ccConf.TEMP_FILE_PREFIX & progName & ".lerrs") = FILE_REGULAR then
           writeln(" *** Linker errors with " <&
-              literal("tmp_" & progName & ccConf.OBJECT_FILE_EXTENSION) <&
-              " - see " <& literal("tmp_" & progName & ".lerrs"));
+              literal(ccConf.TEMP_FILE_PREFIX & progName & ccConf.OBJECT_FILE_EXTENSION) <&
+              " - see " <& literal(ccConf.TEMP_FILE_PREFIX & progName & ".lerrs"));
         else
           writeln(" *** Compiler output:");
           writeln(compilerOutput);
@@ -810,6 +826,7 @@ const proc: main is func
     check("chkbool", chkbool_output);
     check("chkenum", chkenum_output);
     check("chktime", chktime_output);
+    check("chkdecl", chkdecl_output);
     check("chkscan", chkscan_output);
     check("chkjson", chkjson_output);
     check("chktoml", chktoml_output);

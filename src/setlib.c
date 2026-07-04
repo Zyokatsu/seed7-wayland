@@ -657,36 +657,6 @@ objectType set_iconv3 (listType arguments)
 
 
 
-objectType set_idx (listType arguments)
-
-  {
-    setType aSet;
-    intType number;
-    intType position;
-    memSizeType bitset_index;
-    unsigned int bit_index;
-
-  /* set_idx */
-    isit_set(arg_1(arguments));
-    isit_int(arg_3(arguments));
-    aSet = take_set(arg_1(arguments));
-    number = take_int(arg_3(arguments));
-    position = bitset_pos(number);
-    if (position >= aSet->min_position && position <= aSet->max_position) {
-      bitset_index = bitsetIndex(aSet, position);
-      bit_index = ((unsigned int) number) & bitset_mask;
-      if (aSet->bitset[bitset_index] & (((bitSetType) 1) << bit_index)) {
-        return SYS_TRUE_OBJECT;
-      } else {
-        return SYS_FALSE_OBJECT;
-      } /* if */
-    } else {
-      return SYS_FALSE_OBJECT;
-    } /* if */
-  } /* set_idx */
-
-
-
 /**
  *  Add 'number' to the set 'set_to'.
  *  If 'number' is already in 'set_to' then 'set_to' stays unchanged.
@@ -701,6 +671,7 @@ objectType set_incl (listType arguments)
     intType position;
     memSizeType old_size;
     memSizeType new_size;
+    setType resized_set;
     setType old_set;
     memSizeType bitset_index;
     unsigned int bit_index;
@@ -712,6 +683,9 @@ objectType set_incl (listType arguments)
     set_dest = take_set(set_to);
     isit_int(arg_2(arguments));
     number = take_int(arg_2(arguments));
+    logFunction(printf("set_incl(");
+                trace1(set_to);
+                printf(", " FMT_D ")\n", number););
     position = bitset_pos(number);
     if (position > set_dest->max_position) {
       old_size = bitsetSize(set_dest);
@@ -719,11 +693,25 @@ objectType set_incl (listType arguments)
         return raise_exception(SYS_MEM_EXCEPTION);
       } else {
         new_size = bitsetSize2(set_dest->min_position, position);
-        set_dest = REALLOC_SET(set_dest, old_size, new_size);
-        if (set_dest == NULL) {
-          return raise_exception(SYS_MEM_EXCEPTION);
+        resized_set = REALLOC_SET(set_dest, old_size, new_size);
+        if (unlikely(resized_set == NULL)) {
+          old_set = set_dest;
+          if (old_set->min_position != old_set->max_position ||
+              old_set->bitset[0] != 0 ||
+              !ALLOC_SET(set_dest, 1)) {
+            return raise_exception(SYS_MEM_EXCEPTION);
+          } else {
+            /* old_set is an empty set */
+            /* The new set will only contain number. */
+            set_to->value.setValue = set_dest;
+            set_dest->min_position = position;
+            set_dest->max_position = position;
+            set_dest->bitset[0] = 0;
+            FREE_SET(old_set, old_size);
+          } /* if */
         } else {
           COUNT3_SET(old_size, new_size);
+          set_dest = resized_set;
           set_to->value.setValue = set_dest;
           set_dest->max_position = position;
           memset(&set_dest->bitset[old_size], 0,
@@ -737,8 +725,20 @@ objectType set_incl (listType arguments)
       } else {
         new_size = bitsetSize2(position, set_dest->max_position);
         old_set = set_dest;
-        if (!ALLOC_SET(set_dest, new_size)) {
-          return raise_exception(SYS_MEM_EXCEPTION);
+        if (unlikely(!ALLOC_SET(set_dest, new_size))) {
+          if (old_set->min_position != old_set->max_position ||
+              old_set->bitset[0] != 0 ||
+              !ALLOC_SET(set_dest, 1)) {
+            return raise_exception(SYS_MEM_EXCEPTION);
+          } else {
+            /* old_set is an empty set */
+            /* The new set will only contain number. */
+            set_to->value.setValue = set_dest;
+            set_dest->min_position = position;
+            set_dest->max_position = position;
+            set_dest->bitset[0] = 0;
+            FREE_SET(old_set, old_size);
+          } /* if */
         } else {
           set_to->value.setValue = set_dest;
           set_dest->min_position = position;
@@ -753,6 +753,9 @@ objectType set_incl (listType arguments)
     bitset_index = bitsetIndex(set_dest, position);
     bit_index = ((unsigned int) number) & bitset_mask;
     set_dest->bitset[bitset_index] |= (((bitSetType) 1) << bit_index);
+    logFunction(printf("set_incl(");
+                trace1(set_to);
+                printf(", " FMT_D ") -->\n", number););
     return SYS_EMPTY_OBJECT;
   } /* set_incl */
 
@@ -1076,13 +1079,12 @@ objectType set_value (listType arguments)
     obj_arg = take_reference(arg_1(arguments));
     if (unlikely(obj_arg == NULL ||
                  CATEGORY_OF_OBJ(obj_arg) != SETOBJECT ||
-                 take_set(obj_arg) == NULL)) {
+                 (aSet = take_set(obj_arg)) == NULL)) {
       logError(printf("set_value(");
                trace1(obj_arg);
-               printf("): Category is not SETOBJECT.\n"););
+               printf("): Not a legal SETOBJECT.\n"););
       return raise_exception(SYS_RNG_EXCEPTION);
     } else {
-      aSet = take_set(obj_arg);
       set_size = bitsetSize(aSet);
       if (!ALLOC_SET(result, set_size)) {
         return raise_exception(SYS_MEM_EXCEPTION);

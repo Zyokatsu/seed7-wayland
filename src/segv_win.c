@@ -34,7 +34,8 @@
 
 #include "version.h"
 
-#define _WIN32_WINNT 0x500
+#if HAS_VECTORED_EXCEPTION_HANDLER
+#define _WIN32_WINNT 0x501
 #include <windows.h>
 #include <stdio.h>
 #include <setjmp.h>
@@ -51,8 +52,12 @@ static LONG WINAPI segmentationViolationHandler (PEXCEPTION_POINTERS pExp)
     logFunction(printf("segmentationViolationHandler\n"););
     stackOverflow = pExp->ExceptionRecord->ExceptionCode ==
                     EXCEPTION_STACK_OVERFLOW;
-    no_memory(SOURCE_POSITION(3021));
-    return 0;
+    if (stackOverflow) {
+      no_memory(SOURCE_POSITION(3021));
+    } /* if */
+    logFunction(printf("segmentationViolationHandler --> "
+                       "EXCEPTION_CONTINUE_SEARCH\n"););
+    return EXCEPTION_CONTINUE_SEARCH;
   } /* segmentationViolationHandler */
 
 
@@ -81,3 +86,5 @@ void resetExceptionCheck (void)
       stackOverflow = FALSE;
     } /* if */
   } /* resetExceptionCheck */
+
+#endif

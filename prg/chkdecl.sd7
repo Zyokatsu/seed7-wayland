@@ -1,0 +1,447 @@
+
+(********************************************************************)
+(*                                                                  *)
+(*  chkdecl.sd7   Check declarations of local functions.            *)
+(*  Copyright (C) 1992, 1993, 1994, 2004, 2005, 2026  Thomas Mertes *)
+(*                                                                  *)
+(*  This program is free software; you can redistribute it and/or   *)
+(*  modify it under the terms of the GNU General Public License as  *)
+(*  published by the Free Software Foundation; either version 2 of  *)
+(*  the License, or (at your option) any later version.             *)
+(*                                                                  *)
+(*  This program is distributed in the hope that it will be useful, *)
+(*  but WITHOUT ANY WARRANTY; without even the implied warranty of  *)
+(*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the   *)
+(*  GNU General Public License for more details.                    *)
+(*                                                                  *)
+(*  You should have received a copy of the GNU General Public       *)
+(*  License along with this program; if not, write to the           *)
+(*  Free Software Foundation, Inc., 51 Franklin Street,             *)
+(*  Fifth Floor, Boston, MA  02110-1301, USA.                       *)
+(*                                                                  *)
+(********************************************************************)
+
+
+$ include "seed7_05.s7i";
+
+#                          Where declared:
+const integer: A is 11;  # Global
+var   integer: B is 12;  # Global
+# const        C                  XX
+# var          D                  XX
+const integer: E is 13;  # Global XX
+var   integer: F is 14;  # Global XX
+# const        G                     YY
+# var          H                     YY
+const integer: I is 15;  # Global    YY
+var   integer: J is 16;  # Global    YY
+# const        K                  XX YY
+# var          L                  XX YY
+const integer: M is 17;  # Global XX YY
+var   integer: N is 18;  # Global XX YY
+# const        O                        ZZ  
+# var          P                        ZZ  
+# const        Q                  XX    ZZ  
+# var          R                  XX    ZZ  
+# const        S                     YY ZZ  
+# var          T                     YY ZZ  
+# const        U                  XX YY ZZ  
+# var          V                  XX YY ZZ  
+
+var   integer: var_64 is 64;
+var   integer: var_68 is 68;
+var   integer: var_74 is 74;
+var   integer: var_78 is 78;
+
+var integer: errCnt is 0;
+
+
+const proc: XX is func
+  local
+    const integer: C is 21;
+    var   integer: D is 22;
+    const integer: E is 23;
+    var   integer: F is 24;
+    const integer: K is 25;
+    var   integer: L is 26;
+    const integer: M is 27;
+    var   integer: N is 28;
+    const integer: Q is 201;
+    var   integer: R is 202;
+    const integer: U is 203;
+    var   integer: V is 204;
+    var   integer: depth is 0;
+    const proc: YY is func
+      local
+        const integer: G is 31;
+        var   integer: H is 32;
+        const integer: I is 33;
+        var   integer: J is 34;
+        const integer: K is 35;
+        var   integer: L is 36;
+        const integer: M is 37;
+        var   integer: N is 38;
+        const integer: S is 301;
+        var   integer: T is 302;
+        const integer: U is 303;
+        var   integer: V is 304;
+        const proc: WW is func
+          begin
+            while FALSE do
+              WW;
+            end while;
+          end func;
+        const proc: UU (ref proc: VV) is func
+          begin
+            VV;
+          end func;
+        const proc: ZZ is func
+          local
+            const integer: O is 101;
+            var   integer: P is 102;
+            const integer: Q is 103;
+            var   integer: R is 104;
+            const integer: S is 105;
+            var   integer: T is 106;
+            const integer: U is 107;
+            var   integer: V is 108;
+          begin
+            if A <>  11 then writeln("In ZZ: A: " <& A <& ", expected:  11"); incr(errCnt); end if;
+            if B <>  12 then writeln("In ZZ: B: " <& B <& ", expected:  12"); incr(errCnt); end if;
+            if C <>  21 then writeln("In ZZ: C: " <& C <& ", expected:  21"); incr(errCnt); end if;
+            if D <>  22 then writeln("In ZZ: D: " <& D <& ", expected:  22"); incr(errCnt); end if;
+            if E <>  23 then writeln("In ZZ: E: " <& E <& ", expected:  23"); incr(errCnt); end if;
+            if F <>  24 then writeln("In ZZ: F: " <& F <& ", expected:  24"); incr(errCnt); end if;
+            if G <>  31 then writeln("In ZZ: G: " <& G <& ", expected:  31"); incr(errCnt); end if;
+            if H <>  32 then writeln("In ZZ: H: " <& H <& ", expected:  32"); incr(errCnt); end if;
+            if I <>  33 then writeln("In ZZ: I: " <& I <& ", expected:  33"); incr(errCnt); end if;
+            if J <>  34 then writeln("In ZZ: J: " <& J <& ", expected:  34"); incr(errCnt); end if;
+            if K <>  35 then writeln("In ZZ: K: " <& K <& ", expected:  35"); incr(errCnt); end if;
+            if L <>  36 then writeln("In ZZ: L: " <& L <& ", expected:  36"); incr(errCnt); end if;
+            if M <>  37 then writeln("In ZZ: M: " <& M <& ", expected:  37"); incr(errCnt); end if;
+            if N <>  38 then writeln("In ZZ: N: " <& N <& ", expected:  38"); incr(errCnt); end if;
+            if O <> 101 then writeln("In ZZ: O: " <& O <& ", expected: 101"); incr(errCnt); end if;
+            if P <> 102 then writeln("In ZZ: P: " <& P <& ", expected: 102"); incr(errCnt); end if;
+            if Q <> 103 then writeln("In ZZ: Q: " <& Q <& ", expected: 103"); incr(errCnt); end if;
+            if R <> 104 then writeln("In ZZ: R: " <& R <& ", expected: 104"); incr(errCnt); end if;
+            if S <> 105 then writeln("In ZZ: S: " <& S <& ", expected: 105"); incr(errCnt); end if;
+            if T <> 106 then writeln("In ZZ: T: " <& T <& ", expected: 106"); incr(errCnt); end if;
+            if U <> 107 then writeln("In ZZ: U: " <& U <& ", expected: 107"); incr(errCnt); end if;
+            if V <> 108 then writeln("In ZZ: V: " <& V <& ", expected: 108"); incr(errCnt); end if;
+            if depth = 0 then
+              incr(depth);
+              YY;
+            end if;
+            UU(WW);
+            B := 111;
+            D := 112;
+            F := 113;
+            H := 114;
+            J := 115;
+            L := 116;
+            N := 117;
+            P := 118;
+            R := 119;
+            T := 120;
+            V := 121;
+            if A <>  11 then writeln("In ZZ: A: " <& A <& ", expected:  11"); incr(errCnt); end if;
+            if B <> 111 then writeln("In ZZ: B: " <& B <& ", expected: 111"); incr(errCnt); end if;
+            if C <>  21 then writeln("In ZZ: C: " <& C <& ", expected:  21"); incr(errCnt); end if;
+            if D <> 112 then writeln("In ZZ: D: " <& D <& ", expected: 112"); incr(errCnt); end if;
+            if E <>  23 then writeln("In ZZ: E: " <& E <& ", expected:  23"); incr(errCnt); end if;
+            if F <> 113 then writeln("In ZZ: F: " <& F <& ", expected: 113"); incr(errCnt); end if;
+            if G <>  31 then writeln("In ZZ: G: " <& G <& ", expected:  31"); incr(errCnt); end if;
+            if H <> 114 then writeln("In ZZ: H: " <& H <& ", expected: 114"); incr(errCnt); end if;
+            if I <>  33 then writeln("In ZZ: I: " <& I <& ", expected:  33"); incr(errCnt); end if;
+            if J <> 115 then writeln("In ZZ: J: " <& J <& ", expected: 115"); incr(errCnt); end if;
+            if K <>  35 then writeln("In ZZ: K: " <& K <& ", expected:  35"); incr(errCnt); end if;
+            if L <> 116 then writeln("In ZZ: L: " <& L <& ", expected: 116"); incr(errCnt); end if;
+            if M <>  37 then writeln("In ZZ: M: " <& M <& ", expected:  37"); incr(errCnt); end if;
+            if N <> 117 then writeln("In ZZ: N: " <& N <& ", expected: 117"); incr(errCnt); end if;
+            if O <> 101 then writeln("In ZZ: O: " <& O <& ", expected: 101"); incr(errCnt); end if;
+            if P <> 118 then writeln("In ZZ: P: " <& P <& ", expected: 118"); incr(errCnt); end if;
+            if Q <> 103 then writeln("In ZZ: Q: " <& Q <& ", expected: 103"); incr(errCnt); end if;
+            if R <> 119 then writeln("In ZZ: R: " <& R <& ", expected: 119"); incr(errCnt); end if;
+            if S <> 105 then writeln("In ZZ: S: " <& S <& ", expected: 105"); incr(errCnt); end if;
+            if T <> 120 then writeln("In ZZ: T: " <& T <& ", expected: 120"); incr(errCnt); end if;
+            if U <> 107 then writeln("In ZZ: U: " <& U <& ", expected: 107"); incr(errCnt); end if;
+            if V <> 121 then writeln("In ZZ: V: " <& V <& ", expected: 121"); incr(errCnt); end if;
+          end func;
+      begin
+        if A <>  11 then writeln("In YY before ZZ: A: " <& A <& ", expected:  11"); incr(errCnt); end if;
+        if B <>  12 then writeln("In YY before ZZ: B: " <& B <& ", expected:  12"); incr(errCnt); end if;
+        if C <>  21 then writeln("In YY before ZZ: C: " <& C <& ", expected:  21"); incr(errCnt); end if;
+        if D <>  22 then writeln("In YY before ZZ: D: " <& D <& ", expected:  22"); incr(errCnt); end if;
+        if E <>  23 then writeln("In YY before ZZ: E: " <& E <& ", expected:  23"); incr(errCnt); end if;
+        if F <>  24 then writeln("In YY before ZZ: F: " <& F <& ", expected:  24"); incr(errCnt); end if;
+        if G <>  31 then writeln("In YY before ZZ: G: " <& G <& ", expected:  31"); incr(errCnt); end if;
+        if H <>  32 then writeln("In YY before ZZ: H: " <& H <& ", expected:  32"); incr(errCnt); end if;
+        if I <>  33 then writeln("In YY before ZZ: I: " <& I <& ", expected:  33"); incr(errCnt); end if;
+        if J <>  34 then writeln("In YY before ZZ: J: " <& J <& ", expected:  34"); incr(errCnt); end if;
+        if K <>  35 then writeln("In YY before ZZ: K: " <& K <& ", expected:  35"); incr(errCnt); end if;
+        if L <>  36 then writeln("In YY before ZZ: L: " <& L <& ", expected:  36"); incr(errCnt); end if;
+        if M <>  37 then writeln("In YY before ZZ: M: " <& M <& ", expected:  37"); incr(errCnt); end if;
+        if N <>  38 then writeln("In YY before ZZ: N: " <& N <& ", expected:  38"); incr(errCnt); end if;
+        if S <> 301 then writeln("In YY before ZZ: S: " <& S <& ", expected: 301"); incr(errCnt); end if;
+        if T <> 302 then writeln("In YY before ZZ: T: " <& T <& ", expected: 302"); incr(errCnt); end if;
+        if U <> 303 then writeln("In YY before ZZ: U: " <& U <& ", expected: 303"); incr(errCnt); end if;
+        if V <> 304 then writeln("In YY before ZZ: V: " <& V <& ", expected: 304"); incr(errCnt); end if;
+        ZZ;
+        if TRUE then
+          WW;
+        end if;
+        if A <>  11 then writeln("In YY after ZZ: A: " <& A <& ", expected:  11"); incr(errCnt); end if;
+        if B <> 111 then writeln("In YY after ZZ: B: " <& B <& ", expected: 111"); incr(errCnt); end if;
+        if C <>  21 then writeln("In YY after ZZ: C: " <& C <& ", expected:  21"); incr(errCnt); end if;
+        if D <> 112 then writeln("In YY after ZZ: D: " <& D <& ", expected: 112"); incr(errCnt); end if;
+        if E <>  23 then writeln("In YY after ZZ: E: " <& E <& ", expected:  23"); incr(errCnt); end if;
+        if F <> 113 then writeln("In YY after ZZ: F: " <& F <& ", expected: 113"); incr(errCnt); end if;
+        if G <>  31 then writeln("In YY after ZZ: G: " <& G <& ", expected:  31"); incr(errCnt); end if;
+        if H <> 114 then writeln("In YY after ZZ: H: " <& H <& ", expected: 114"); incr(errCnt); end if;
+        if I <>  33 then writeln("In YY after ZZ: I: " <& I <& ", expected:  33"); incr(errCnt); end if;
+        if J <> 115 then writeln("In YY after ZZ: J: " <& J <& ", expected: 115"); incr(errCnt); end if;
+        if K <>  35 then writeln("In YY after ZZ: K: " <& K <& ", expected:  35"); incr(errCnt); end if;
+        if L <> 116 then writeln("In YY after ZZ: L: " <& L <& ", expected: 116"); incr(errCnt); end if;
+        if M <>  37 then writeln("In YY after ZZ: M: " <& M <& ", expected:  37"); incr(errCnt); end if;
+        if N <> 117 then writeln("In YY after ZZ: N: " <& N <& ", expected: 117"); incr(errCnt); end if;
+        if S <> 301 then writeln("In YY after ZZ: S: " <& S <& ", expected: 301"); incr(errCnt); end if;
+        if T <> 302 then writeln("In YY after ZZ: T: " <& T <& ", expected: 302"); incr(errCnt); end if;
+        if U <> 303 then writeln("In YY after ZZ: U: " <& U <& ", expected: 303"); incr(errCnt); end if;
+        if V <> 304 then writeln("In YY after ZZ: V: " <& V <& ", expected: 304"); incr(errCnt); end if;
+        B := 41;
+        D := 43;
+        F := 45;
+        H := 42;
+        J := 44;
+        L := 46;
+        N := 48;
+        T := 311;
+        V := 312;
+        if A <>  11 then writeln("In YY: A: " <& A <& ", expected:  11"); incr(errCnt); end if;
+        if B <>  41 then writeln("In YY: B: " <& B <& ", expected:  41"); incr(errCnt); end if;
+        if C <>  21 then writeln("In YY: C: " <& C <& ", expected:  21"); incr(errCnt); end if;
+        if D <>  43 then writeln("In YY: D: " <& D <& ", expected:  43"); incr(errCnt); end if;
+        if E <>  23 then writeln("In YY: E: " <& E <& ", expected:  23"); incr(errCnt); end if;
+        if F <>  45 then writeln("In YY: F: " <& F <& ", expected:  45"); incr(errCnt); end if;
+        if G <>  31 then writeln("In YY: G: " <& G <& ", expected:  31"); incr(errCnt); end if;
+        if H <>  42 then writeln("In YY: H: " <& H <& ", expected:  42"); incr(errCnt); end if;
+        if I <>  33 then writeln("In YY: I: " <& I <& ", expected:  33"); incr(errCnt); end if;
+        if J <>  44 then writeln("In YY: J: " <& J <& ", expected:  44"); incr(errCnt); end if;
+        if K <>  35 then writeln("In YY: K: " <& K <& ", expected:  35"); incr(errCnt); end if;
+        if L <>  46 then writeln("In YY: L: " <& L <& ", expected:  46"); incr(errCnt); end if;
+        if M <>  37 then writeln("In YY: M: " <& M <& ", expected:  37"); incr(errCnt); end if;
+        if N <>  48 then writeln("In YY: N: " <& N <& ", expected:  48"); incr(errCnt); end if;
+        if S <> 301 then writeln("In YY: S: " <& S <& ", expected: 301"); incr(errCnt); end if;
+        if T <> 311 then writeln("In YY: T: " <& T <& ", expected: 311"); incr(errCnt); end if;
+        if U <> 303 then writeln("In YY: U: " <& U <& ", expected: 303"); incr(errCnt); end if;
+        if V <> 312 then writeln("In YY: V: " <& V <& ", expected: 312"); incr(errCnt); end if;
+      end func;
+  begin
+    if A <>  11 then writeln("In XX before YY: A: " <& A <& ", expected:  11"); incr(errCnt); end if;
+    if B <>  12 then writeln("In XX before YY: B: " <& B <& ", expected:  12"); incr(errCnt); end if;
+    if C <>  21 then writeln("In XX before YY: C: " <& C <& ", expected:  21"); incr(errCnt); end if;
+    if D <>  22 then writeln("In XX before YY: D: " <& D <& ", expected:  22"); incr(errCnt); end if;
+    if E <>  23 then writeln("In XX before YY: E: " <& E <& ", expected:  23"); incr(errCnt); end if;
+    if F <>  24 then writeln("In XX before YY: F: " <& F <& ", expected:  24"); incr(errCnt); end if;
+    if I <>  15 then writeln("In XX before YY: I: " <& I <& ", expected:  15"); incr(errCnt); end if;
+    if J <>  16 then writeln("In XX before YY: J: " <& J <& ", expected:  16"); incr(errCnt); end if;
+    if K <>  25 then writeln("In XX before YY: K: " <& K <& ", expected:  25"); incr(errCnt); end if;
+    if L <>  26 then writeln("In XX before YY: L: " <& L <& ", expected:  26"); incr(errCnt); end if;
+    if M <>  27 then writeln("In XX before YY: M: " <& M <& ", expected:  27"); incr(errCnt); end if;
+    if N <>  28 then writeln("In XX before YY: N: " <& N <& ", expected:  28"); incr(errCnt); end if;
+    if Q <> 201 then writeln("In XX before YY: Q: " <& Q <& ", expected: 201"); incr(errCnt); end if;
+    if R <> 202 then writeln("In XX before YY: R: " <& R <& ", expected: 202"); incr(errCnt); end if;
+    if U <> 203 then writeln("In XX before YY: U: " <& U <& ", expected: 203"); incr(errCnt); end if;
+    if V <> 204 then writeln("In XX before YY: V: " <& V <& ", expected: 204"); incr(errCnt); end if;
+    YY;
+    if A <>  11 then writeln("In XX after YY: A: " <& A <& ", expected:  11"); incr(errCnt); end if;
+    if B <>  41 then writeln("In XX after YY: B: " <& B <& ", expected:  41"); incr(errCnt); end if;
+    if C <>  21 then writeln("In XX after YY: C: " <& C <& ", expected:  21"); incr(errCnt); end if;
+    if D <>  43 then writeln("In XX after YY: D: " <& D <& ", expected:  43"); incr(errCnt); end if;
+    if E <>  23 then writeln("In XX after YY: E: " <& E <& ", expected:  23"); incr(errCnt); end if;
+    if F <>  45 then writeln("In XX after YY: F: " <& F <& ", expected:  45"); incr(errCnt); end if;
+    if I <>  15 then writeln("In XX after YY: I: " <& I <& ", expected:  15"); incr(errCnt); end if;
+    if J <>  16 then writeln("In XX after YY: J: " <& J <& ", expected:  16"); incr(errCnt); end if;
+    if K <>  25 then writeln("In XX after YY: K: " <& K <& ", expected:  25"); incr(errCnt); end if;
+    if L <>  26 then writeln("In XX after YY: L: " <& L <& ", expected:  26"); incr(errCnt); end if;
+    if M <>  27 then writeln("In XX after YY: M: " <& M <& ", expected:  27"); incr(errCnt); end if;
+    if N <>  28 then writeln("In XX after YY: N: " <& N <& ", expected:  28"); incr(errCnt); end if;
+    if Q <> 201 then writeln("In XX after YY: Q: " <& Q <& ", expected: 201"); incr(errCnt); end if;
+    if R <> 202 then writeln("In XX after YY: R: " <& R <& ", expected: 202"); incr(errCnt); end if;
+    if U <> 203 then writeln("In XX after YY: U: " <& U <& ", expected: 203"); incr(errCnt); end if;
+    if V <> 204 then writeln("In XX after YY: V: " <& V <& ", expected: 204"); incr(errCnt); end if;
+    B := 51;
+    D := 52;
+    F := 54;
+    L := 56;
+    N := 58;
+  end func;
+
+
+
+const proc: AA (in integer: C, in var integer: D, ref integer: E, inout integer: F,
+    in integer: K, in var integer: L, ref integer: M, inout integer: N) is func
+  local
+    var   integer: depth is 0;
+    const proc: BB (in integer: G, in var integer: H, ref integer: I, inout integer: J,
+        in integer: K, in var integer: L, ref integer: M, inout integer: N) is func
+      begin
+        if A <> 11 then writeln("In BB: A: " <& A <& ", expected: 11"); incr(errCnt); end if;
+        if B <> 51 then writeln("In BB: B: " <& B <& ", expected: 51"); incr(errCnt); end if;
+        if C <> 71 then writeln("In BB: C: " <& C <& ", expected: 71"); incr(errCnt); end if;
+        if D <> 72 then writeln("In BB: D: " <& D <& ", expected: 72"); incr(errCnt); end if;
+        if E <> 73 then writeln("In BB: E: " <& E <& ", expected: 73"); incr(errCnt); end if;
+        if F <> 74 then writeln("In BB: F: " <& F <& ", expected: 74"); incr(errCnt); end if;
+        if G <> 61 then writeln("In BB: G: " <& G <& ", expected: 61"); incr(errCnt); end if;
+        if H <> 51 then writeln("In BB: H: " <& H <& ", expected: 51"); incr(errCnt); end if;
+        if I <> 63 then writeln("In BB: I: " <& I <& ", expected: 63"); incr(errCnt); end if;
+        if J <> 64 then writeln("In BB: J: " <& J <& ", expected: 64"); incr(errCnt); end if;
+        if K <> 65 then writeln("In BB: K: " <& K <& ", expected: 65"); incr(errCnt); end if;
+        if L <> 72 then writeln("In BB: L: " <& L <& ", expected: 72"); incr(errCnt); end if;
+        if M <> 67 then writeln("In BB: M: " <& M <& ", expected: 67"); incr(errCnt); end if;
+        if N <> 68 then writeln("In BB: N: " <& N <& ", expected: 68"); incr(errCnt); end if;
+        if var_64 <> 64 then writeln("In BB: var_64: " <& var_64 <& ", expected: 64"); incr(errCnt); end if;
+        if var_68 <> 68 then writeln("In BB: var_68: " <& var_68 <& ", expected: 68"); incr(errCnt); end if;
+        if depth = 0 then
+          incr(depth);
+          BB(G, H, I, J, K, L, M, N);
+        end if;
+        B := 53;
+        D := 79;
+        H := 82;
+        J := 84;
+        L := 86;
+        N := 88;
+        if A <> 11 then writeln("In BB: A: " <& A <& ", expected: 11"); incr(errCnt); end if;
+        if B <> 53 then writeln("In BB: B: " <& B <& ", expected: 53"); incr(errCnt); end if;
+        if C <> 71 then writeln("In BB: C: " <& C <& ", expected: 71"); incr(errCnt); end if;
+        if D <> 79 then writeln("In BB: D: " <& D <& ", expected: 79"); incr(errCnt); end if;
+        if E <> 73 then writeln("In BB: E: " <& E <& ", expected: 73"); incr(errCnt); end if;
+        if F <> 74 then writeln("In BB: F: " <& F <& ", expected: 74"); incr(errCnt); end if;
+        if G <> 61 then writeln("In BB: G: " <& G <& ", expected: 61"); incr(errCnt); end if;
+        if H <> 82 then writeln("In BB: H: " <& H <& ", expected: 82"); incr(errCnt); end if;
+        if I <> 63 then writeln("In BB: I: " <& I <& ", expected: 63"); incr(errCnt); end if;
+        if J <> 84 then writeln("In BB: J: " <& J <& ", expected: 684"); incr(errCnt); end if;
+        if K <> 65 then writeln("In BB: K: " <& K <& ", expected: 65"); incr(errCnt); end if;
+        if L <> 86 then writeln("In BB: L: " <& L <& ", expected: 86"); incr(errCnt); end if;
+        if M <> 67 then writeln("In BB: M: " <& M <& ", expected: 67"); incr(errCnt); end if;
+        if N <> 88 then writeln("In BB: N: " <& N <& ", expected: 88"); incr(errCnt); end if;
+        if var_64 <> 84 then writeln("In BB: var_64: " <& var_64 <& ", expected: 84"); incr(errCnt); end if;
+        if var_68 <> 88 then writeln("In BB: var_84: " <& var_68 <& ", expected: 88"); incr(errCnt); end if;
+      end func;
+  begin
+    if A <> 11 then writeln("In AA before BB: A: " <& A <& ", expected: 11"); incr(errCnt); end if;
+    if B <> 51 then writeln("In AA before BB: B: " <& B <& ", expected: 51"); incr(errCnt); end if;
+    if C <> 71 then writeln("In AA before BB: C: " <& C <& ", expected: 71"); incr(errCnt); end if;
+    if D <> 72 then writeln("In AA before BB: D: " <& D <& ", expected: 72"); incr(errCnt); end if;
+    if E <> 73 then writeln("In AA before BB: E: " <& E <& ", expected: 73"); incr(errCnt); end if;
+    if F <> 74 then writeln("In AA before BB: F: " <& F <& ", expected: 74"); incr(errCnt); end if;
+    if I <> 15 then writeln("In AA before BB: I: " <& I <& ", expected: 15"); incr(errCnt); end if;
+    if J <> 16 then writeln("In AA before BB: J: " <& J <& ", expected: 16"); incr(errCnt); end if;
+    if K <> 75 then writeln("In AA before BB: K: " <& K <& ", expected: 75"); incr(errCnt); end if;
+    if L <> 76 then writeln("In AA before BB: L: " <& L <& ", expected: 76"); incr(errCnt); end if;
+    if M <> 77 then writeln("In AA before BB: M: " <& M <& ", expected: 77"); incr(errCnt); end if;
+    if N <> 78 then writeln("In AA before BB: N: " <& N <& ", expected: 78"); incr(errCnt); end if;
+    if var_64 <> 64 then writeln("In AA before BB: var_64: " <& var_64 <& ", expected: 64"); incr(errCnt); end if;
+    if var_68 <> 68 then writeln("In AA before BB: var_68: " <& var_68 <& ", expected: 68"); incr(errCnt); end if;
+    BB(61, B, 63, var_64, 65, D, 67, var_68);
+    if A <> 11 then writeln("In AA after BB: A: " <& A <& ", expected: 11"); incr(errCnt); end if;
+    if B <> 53 then writeln("In AA after BB: B: " <& B <& ", expected: 53"); incr(errCnt); end if;
+    if C <> 71 then writeln("In AA after BB: C: " <& C <& ", expected: 71"); incr(errCnt); end if;
+    if D <> 79 then writeln("In AA after BB: D: " <& D <& ", expected: 79"); incr(errCnt); end if;
+    if E <> 73 then writeln("In AA after BB: E: " <& E <& ", expected: 73"); incr(errCnt); end if;
+    if F <> 74 then writeln("In AA after BB: F: " <& F <& ", expected: 74"); incr(errCnt); end if;
+    if I <> 15 then writeln("In AA after BB: I: " <& I <& ", expected: 15"); incr(errCnt); end if;
+    if J <> 16 then writeln("In AA after BB: J: " <& J <& ", expected: 16"); incr(errCnt); end if;
+    if K <> 75 then writeln("In AA after BB: K: " <& K <& ", expected: 75"); incr(errCnt); end if;
+    if L <> 76 then writeln("In AA after BB: L: " <& L <& ", expected: 76"); incr(errCnt); end if;
+    if M <> 77 then writeln("In AA after BB: M: " <& M <& ", expected: 77"); incr(errCnt); end if;
+    if N <> 78 then writeln("In AA after BB: N: " <& N <& ", expected: 78"); incr(errCnt); end if;
+    if var_64 <> 84 then writeln("In AA after BB: var_64: " <& var_64 <& ", expected: 84"); incr(errCnt); end if;
+    if var_68 <> 88 then writeln("In AA after BB: var_84: " <& var_68 <& ", expected: 88"); incr(errCnt); end if;
+    if var_74 <> 74 then writeln("In AA: var_74: " <& var_74 <& ", expected: 74"); incr(errCnt); end if;
+    if var_78 <> 78 then writeln("In AA: var_78: " <& var_78 <& ", expected: 78"); incr(errCnt); end if;
+    D := 92;
+    F := 94;
+    L := 96;
+    N := 98;
+    if var_74 <> 94 then writeln("In AA: var_74: " <& var_74 <& ", expected: 94"); incr(errCnt); end if;
+    if var_78 <> 98 then writeln("In AA: var_78: " <& var_78 <& ", expected: 98"); incr(errCnt); end if;
+  end func;
+
+
+const proc: recursive (in integer: number) is func
+  local
+    var integer: loc_num is 20;
+  begin
+    if loc_num <> 20 then
+      write("In recursive: loc_num = ");
+      write(loc_num);
+      write(" but should be ");
+      writeln(20);
+      incr(errCnt);
+    end if;
+    loc_num := number;
+    if number > 0 then
+      recursive(pred(number));
+    end if;
+    if loc_num <> number then
+      write("In recursive: loc_num = ");
+      write(loc_num);
+      write(" but should be ");
+      writeln(number);
+      incr(errCnt);
+    end if;
+  end func;
+
+
+const proc: main is func
+  begin
+    writeln;
+    if A <> 11 then write("In main before XX: A = "); write(A); writeln(" but should be 11"); incr(errCnt); end if;
+    if B <> 12 then write("In main before XX: B = "); write(B); writeln(" but should be 12"); incr(errCnt); end if;
+    if E <> 13 then write("In main before XX: E = "); write(E); writeln(" but should be 13"); incr(errCnt); end if;
+    if F <> 14 then write("In main before XX: F = "); write(F); writeln(" but should be 14"); incr(errCnt); end if;
+    if I <> 15 then write("In main before XX: I = "); write(I); writeln(" but should be 15"); incr(errCnt); end if;
+    if J <> 16 then write("In main before XX: J = "); write(J); writeln(" but should be 16"); incr(errCnt); end if;
+    if M <> 17 then write("In main before XX: M = "); write(M); writeln(" but should be 17"); incr(errCnt); end if;
+    if N <> 18 then write("In main before XX: N = "); write(N); writeln(" but should be 18"); incr(errCnt); end if;
+    XX;
+    if A <> 11 then write("In main after XX: A = "); write(A); writeln(" but should be 11"); incr(errCnt); end if;
+    if B <> 51 then write("In main after XX: B = "); write(B); writeln(" but should be 51"); incr(errCnt); end if;
+    if E <> 13 then write("In main after XX: E = "); write(E); writeln(" but should be 13"); incr(errCnt); end if;
+    if F <> 14 then write("In main after XX: F = "); write(F); writeln(" but should be 14"); incr(errCnt); end if;
+    if I <> 15 then write("In main after XX: I = "); write(I); writeln(" but should be 15"); incr(errCnt); end if;
+    if J <> 16 then write("In main after XX: J = "); write(J); writeln(" but should be 16"); incr(errCnt); end if;
+    if M <> 17 then write("In main after XX: M = "); write(M); writeln(" but should be 17"); incr(errCnt); end if;
+    if N <> 18 then write("In main after XX: N = "); write(N); writeln(" but should be 18"); incr(errCnt); end if;
+
+    if errCnt = 0 then
+      writeln("Local variables work correctly.");
+    end if;
+
+    errCnt := 0;
+    if var_74 <> 74 then writeln("In main before AA: var_74: " <& var_74 <& ", expected: 74"); incr(errCnt); end if;
+    if var_78 <> 78 then writeln("In main before AA: var_78: " <& var_78 <& ", expected: 78"); incr(errCnt); end if;
+    AA(71, 72, 73, var_74, 75, 76, 77, var_78);
+    if A <> 11 then write("In main after AA: A = "); write(A); writeln(" but should be 11"); incr(errCnt); end if;
+    if B <> 53 then write("In main after AA: B = "); write(B); writeln(" but should be 53"); incr(errCnt); end if;
+    if E <> 13 then write("In main after AA: E = "); write(E); writeln(" but should be 13"); incr(errCnt); end if;
+    if F <> 14 then write("In main after AA: F = "); write(F); writeln(" but should be 14"); incr(errCnt); end if;
+    if I <> 15 then write("In main after AA: I = "); write(I); writeln(" but should be 15"); incr(errCnt); end if;
+    if J <> 16 then write("In main after AA: J = "); write(J); writeln(" but should be 16"); incr(errCnt); end if;
+    if M <> 17 then write("In main after AA: M = "); write(M); writeln(" but should be 17"); incr(errCnt); end if;
+    if N <> 18 then write("In main after AA: N = "); write(N); writeln(" but should be 18"); incr(errCnt); end if;
+    if var_74 <> 94 then writeln("In main after AA: var_74: " <& var_74 <& ", expected: 94"); incr(errCnt); end if;
+    if var_78 <> 98 then writeln("In main after AA: var_78: " <& var_78 <& ", expected: 98"); incr(errCnt); end if;
+
+    if errCnt = 0 then
+      writeln("Parameters work correctly.");
+    end if;
+
+    errCnt := 0;
+    recursive(10);
+    if errCnt = 0 then
+      writeln("Recursive local variables work correctly.");
+    end if;
+  end func;

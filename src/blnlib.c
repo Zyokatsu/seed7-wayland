@@ -89,7 +89,7 @@ objectType bln_and (listType arguments)
 
 
 /**
- *  Assign dest/arg_1 and source/arg_3 to dest/arg_1.
+ *  Assign the result of 'dest/arg_1 and source/arg_3' to dest/arg_1.
  *  This corresponds to dest := dest and source;
  *  The 'and' operation used here always evaluates the right argument.
  */
@@ -313,6 +313,7 @@ objectType bln_lt (listType arguments)
 
 /**
  *  Check if two boolean values are not equal.
+ *  The boolean <> operator is the same as an exclusive or.
  *  @return FALSE if the two boolean values are equal,
  *          TRUE otherwise.
  */
@@ -387,7 +388,25 @@ objectType bln_or (listType arguments)
 
 
 /**
- *  Assign dest/arg_1 or source/arg_3 to dest/arg_1.
+ *  Convert to integer.
+ *  @return 0 if boolValue is FALSE, and
+ *          1 if boolValue is TRUE.
+ */
+objectType bln_ord (listType arguments)
+
+  {
+    intType ordinal;
+
+  /* bln_ord */
+    isit_bool(arg_1(arguments));
+    ordinal = take_bool(arg_1(arguments)) == SYS_TRUE_OBJECT;
+    return bld_int_temp(ordinal);
+  } /* bln_ord */
+
+
+
+/**
+ *  Assign the result of 'dest/arg_1 or source/arg_3' to dest/arg_1.
  *  This corresponds to dest := dest or source;
  *  The 'or' operation used here always evaluates the right argument.
  */
@@ -406,24 +425,6 @@ objectType bln_or_assign (listType arguments)
     } /* if */
     return SYS_EMPTY_OBJECT;
   } /* bln_or_assign */
-
-
-
-/**
- *  Convert to integer.
- *  @return 0 if boolValue is FALSE, and
- *          1 if boolValue is TRUE.
- */
-objectType bln_ord (listType arguments)
-
-  {
-    intType ordinal;
-
-  /* bln_ord */
-    isit_bool(arg_1(arguments));
-    ordinal = take_bool(arg_1(arguments)) == SYS_TRUE_OBJECT;
-    return bld_int_temp(ordinal);
-  } /* bln_ord */
 
 
 
@@ -479,7 +480,7 @@ objectType bln_ternary (listType arguments)
     } else {
       result = evaluate(arg_5(arguments));
     } /* if */
-    if (result != NULL &&
+    if (!fail_flag && result != NULL &&
         (CATEGORY_OF_OBJ(result) == CONSTENUMOBJECT ||
          CATEGORY_OF_OBJ(result) == VARENUMOBJECT)) {
       if (TEMP_OBJECT(result)) {
@@ -532,8 +533,9 @@ objectType bln_value (listType arguments)
 
 
 /**
- *  Assign dest/arg_1 xor source/arg_3 to dest/arg_1.
+ *  Assign the result of 'dest/arg_1 <> source/arg_3' to dest/arg_1.
  *  This corresponds to dest := dest <> source;
+ *  The boolean <> operator is the same as an exclusive or.
  */
 objectType bln_xor_assign (listType arguments)
 

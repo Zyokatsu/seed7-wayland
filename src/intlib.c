@@ -1070,6 +1070,53 @@ objectType int_mult_assign (listType arguments)
 
 
 /**
+ *  Check if two integer numbers are not equal.
+ *  @return FALSE if both numbers are equal,
+ *          TRUE otherwise.
+ */
+objectType int_ne (listType arguments)
+
+  { /* int_ne */
+    isit_int(arg_1(arguments));
+    isit_int(arg_3(arguments));
+    if (take_int(arg_1(arguments)) !=
+        take_int(arg_3(arguments))) {
+      return SYS_TRUE_OBJECT;
+    } else {
+      return SYS_FALSE_OBJECT;
+    } /* if */
+  } /* int_ne */
+
+
+
+/**
+ *  Minus sign, negate an integer number.
+ *  @return the negated value of the number.
+ *  @exception OVERFLOW_ERROR If an integer overflow occurs.
+ */
+objectType int_negate (listType arguments)
+
+  {
+    intType number;
+
+  /* int_negate */
+    isit_int(arg_2(arguments));
+    number = take_int(arg_2(arguments));
+#if CHECK_INT_OVERFLOW && TWOS_COMPLEMENT_INTTYPE
+    if (unlikely(number == INTTYPE_MIN)) {
+      /* Changing the sign of the most negative number in twos */
+      /* complement arithmetic triggers an overflow.           */
+      logError(printf("int_negate(" FMT_D "): No corresponding positive number.\n",
+                      INTTYPE_MIN););
+      return raise_exception(SYS_OVF_EXCEPTION);
+    } /* if */
+#endif
+    return bld_int_temp(-number);
+  } /* int_negate */
+
+
+
+/**
  *  Convert an integer into a big-endian encoded string of bytes.
  *  Negative numbers use a twos-complement representation.
  *  The result uses a signed binary representation with a base of 256.
@@ -1162,53 +1209,6 @@ objectType int_n_bytes_le_unsigned (listType arguments)
     return bld_stri_temp(intNBytesLeUnsigned(take_int(arg_1(arguments)),
                                              take_int(arg_4(arguments))));
   } /* int_n_bytes_le_unsigned */
-
-
-
-/**
- *  Check if two integer numbers are not equal.
- *  @return FALSE if both numbers are equal,
- *          TRUE otherwise.
- */
-objectType int_ne (listType arguments)
-
-  { /* int_ne */
-    isit_int(arg_1(arguments));
-    isit_int(arg_3(arguments));
-    if (take_int(arg_1(arguments)) !=
-        take_int(arg_3(arguments))) {
-      return SYS_TRUE_OBJECT;
-    } else {
-      return SYS_FALSE_OBJECT;
-    } /* if */
-  } /* int_ne */
-
-
-
-/**
- *  Minus sign, negate an integer number.
- *  @return the negated value of the number.
- *  @exception OVERFLOW_ERROR If an integer overflow occurs.
- */
-objectType int_negate (listType arguments)
-
-  {
-    intType number;
-
-  /* int_negate */
-    isit_int(arg_2(arguments));
-    number = take_int(arg_2(arguments));
-#if CHECK_INT_OVERFLOW && TWOS_COMPLEMENT_INTTYPE
-    if (unlikely(number == INTTYPE_MIN)) {
-      /* Changing the sign of the most negative number in twos */
-      /* complement arithmetic triggers an overflow.           */
-      logError(printf("int_negate(" FMT_D "): No corresponding positive number.\n",
-                      INTTYPE_MIN););
-      return raise_exception(SYS_OVF_EXCEPTION);
-    } /* if */
-#endif
-    return bld_int_temp(-number);
-  } /* int_negate */
 
 
 

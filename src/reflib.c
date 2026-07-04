@@ -66,20 +66,6 @@
 
 
 
-objectType ref_alloc (listType arguments)
-
-  { /* ref_alloc */
-    isit_reference(arg_1(arguments));
-    logFunction(printf("ref_alloc(" FMT_U_MEM " ",
-                       (memSizeType) take_reference(arg_1(arguments)));
-                trace1(take_reference(arg_1(arguments)));
-                printf(")\n"););
-    return bld_reference_temp(
-        refAlloc(take_reference(arg_1(arguments))));
-  } /* ref_alloc */
-
-
-
 objectType ref_alloc_int (listType arguments)
 
   { /* ref_alloc_int */
@@ -100,6 +86,40 @@ objectType ref_alloc_int (listType arguments)
 
 
 
+objectType ref_alloc_list (listType arguments)
+
+  { /* ref_alloc_list */
+    isit_int(arg_1(arguments));
+    isit_reference(arg_2(arguments));
+    logFunction(printf("ref_alloc_list(");
+                printcategory((objectCategory) take_int(arg_1(arguments)));
+                printf(", ");
+                trace1(take_reference(arg_2(arguments)));
+                printf(")\n"););
+    return bld_reference_temp(
+        refAllocList(take_int(arg_1(arguments)),
+                     take_reference(arg_2(arguments))));
+  } /* ref_alloc_list */
+
+
+
+objectType ref_alloc_ref (listType arguments)
+
+  { /* ref_alloc_ref */
+    isit_int(arg_1(arguments));
+    isit_reference(arg_2(arguments));
+    logFunction(printf("ref_alloc_ref(");
+                printcategory((objectCategory) take_int(arg_1(arguments)));
+                printf(", ");
+                trace1(take_reference(arg_2(arguments)));
+                printf(")\n"););
+    return bld_reference_temp(
+        refAllocRef(take_int(arg_1(arguments)),
+                    take_reference(arg_2(arguments))));
+  } /* ref_alloc_ref */
+
+
+
 objectType ref_alloc_stri (listType arguments)
 
   { /* ref_alloc_stri */
@@ -117,23 +137,6 @@ objectType ref_alloc_stri (listType arguments)
                      take_type(arg_2(arguments)),
                      take_stri(arg_3(arguments))));
   } /* ref_alloc_stri */
-
-
-
-objectType ref_alloc_var (listType arguments)
-
-  { /* ref_alloc_var */
-    isit_type(arg_1(arguments));
-    isit_int(arg_2(arguments));
-    logFunction(printf("ref_alloc_var(");
-                printtype(take_type(arg_1(arguments)));
-                printf(", ");
-                printcategory(take_int(arg_2(arguments)));
-                printf(")\n"););
-    return bld_reference_temp(
-        refAllocVar(take_type(arg_1(arguments)),
-                    take_int(arg_2(arguments))));
-  } /* ref_alloc_var */
 
 
 
@@ -163,6 +166,9 @@ objectType ref_arrmaxidx (listType arguments)
 
   { /* ref_arrmaxidx */
     isit_reference(arg_1(arguments));
+    logFunction(printf("ref_arrmaxidx(");
+                trace1(take_reference(arg_1(arguments)));
+                printf(")\n"););
     return bld_int_temp(refArrMaxIdx(
         take_reference(arg_1(arguments))));
   } /* ref_arrmaxidx */
@@ -179,6 +185,9 @@ objectType ref_arrminidx (listType arguments)
 
   { /* ref_arrminidx */
     isit_reference(arg_1(arguments));
+    logFunction(printf("ref_arrminidx(");
+                trace1(take_reference(arg_1(arguments)));
+                printf(")\n"););
     return bld_int_temp(refArrMinIdx(
         take_reference(arg_1(arguments))));
   } /* ref_arrminidx */
@@ -631,7 +640,8 @@ objectType ref_path (listType arguments)
   /* ref_path */
     isit_reference(arg_1(arguments));
     path = refPath(take_reference(arg_1(arguments)));
-    if (path == NULL) {
+    if (unlikely(path == NULL)) {
+      /* refPath() already raised RANGE_ERROR */
       result = NULL;
     } else {
       result = bld_stri_temp(strCreate(path));
@@ -683,92 +693,11 @@ objectType ref_scttolist (listType arguments)
 
 
 
-objectType ref_select (listType arguments)
-
-  {
-    objectType refer;
-    structType stru1;
-    objectType selector;
-    objectType selector_syobject;
-    memSizeType position;
-    objectType struct_pointer;
-    objectType result;
-
-  /* ref_select */
-    isit_reference(arg_1(arguments));
-    refer = take_reference(arg_1(arguments));
-    if (refer != NULL) {
-      isit_struct(refer);
-      stru1 = take_struct(refer);
-      selector = arg_3(arguments);
-/*
-printf("stru1 ");
-trace1(arg_1(arguments));
-printf("\n");
-printf("selector ");
-trace1(selector);
-printf("\n");
-*/
-      if (HAS_ENTITY(selector) && GET_ENTITY(selector)->syobject != NULL) {
-        selector_syobject = GET_ENTITY(selector)->syobject;
-        position = stru1->size;
-        struct_pointer = &stru1->stru[position - 1];
-        while (position > 0) {
-/*
-printf("test " FMT_U_MEM ": ", position);
-trace1(struct_pointer);
-printf("\n");
-*/
-          if (HAS_ENTITY(struct_pointer) &&
-              GET_ENTITY(struct_pointer)->syobject == selector_syobject) {
-            if (TEMP_OBJECT(arg_1(arguments))) {
-/*
-              printf("ref_select of TEMP_OBJECT\n");
-              printf("stru1 ");
-              trace1(arg_1(arguments));
-              printf("\n");
-              printf("selector ");
-              trace1(selector);
-              printf("\n");
-*/
-              /* The struct will be destroyed after selecting. */
-              /* A copy is necessary here to avoid a crash !!!!! */
-              if (!ALLOC_OBJECT(result)) {
-                result = raise_exception(SYS_MEM_EXCEPTION);
-              } else {
-                memcpy(result, struct_pointer, sizeof(objectRecord));
-                SET_TEMP_FLAG(result);
-                destr_struct(stru1->stru,
-                    (memSizeType) (struct_pointer - stru1->stru));
-                destr_struct(&struct_pointer[1],
-                    (stru1->size - (memSizeType) (struct_pointer - stru1->stru) - 1));
-                FREE_STRUCT(stru1, stru1->size);
-                arg_1(arguments)->value.structValue = NULL;
-              } /* if */
-              return result;
-            } else {
-              return struct_pointer;
-            } /* if */
-          } /* if */
-          position--;
-          struct_pointer--;
-        } /* while */
-      } /* if */
-    } /* if */
-    logError(printf("ref_select(");
-             trace1(arg_1(arguments));
-             printf(", ");
-             trace1(arg_3(arguments));
-             printf("): Selector not found.\n"););
-    return raise_exception(SYS_RNG_EXCEPTION);
-  } /* ref_select */
-
-
-
 /**
  *  Set the category of aReference/arg_1 to aCategory/arg_2.
  *  Set the category of a referenced object.
- *  @exception RANGE_ERROR If aReference/arg_1 is NIL.
+ *  @exception RANGE_ERROR If aReference/arg_1 is NIL or
+ *             the category conversion is illegal.
  */
 objectType ref_setcategory (listType arguments)
 

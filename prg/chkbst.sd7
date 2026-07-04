@@ -469,6 +469,8 @@ const proc: check_bstring_comparisons is func
 const proc: check_bstring_index is func
   local
     var boolean: okay is TRUE;
+    var boolean: ok is TRUE;
+    var char: aChar is ' ';
   begin
     if  bstring("1234567890") [  1 ] <> '1' or
         bstring("1234567890") [  2 ] <> '2' or
@@ -480,7 +482,7 @@ const proc: check_bstring_index is func
         bstring("1234567890") [  8 ] <> '8' or
         bstring("1234567890") [  9 ] <> '9' or
         bstring("1234567890") [ 10 ] <> '0' then
-      writeln(" ***** STRING [ INDEX ] does not work correctly.");
+      writeln(" ***** BSTRING [ INDEX ] does not work correctly. (1)");
       okay := FALSE;
     end if;
     if  bstriExpr(bstring("1234567890")) [  1 ] <> '1' or
@@ -493,7 +495,7 @@ const proc: check_bstring_index is func
         bstriExpr(bstring("1234567890")) [  8 ] <> '8' or
         bstriExpr(bstring("1234567890")) [  9 ] <> '9' or
         bstriExpr(bstring("1234567890")) [ 10 ] <> '0' then
-      writeln(" ***** STRING [ INDEX ] does not work correctly.");
+      writeln(" ***** BSTRING [ INDEX ] does not work correctly. (2)");
       okay := FALSE;
     end if;
     if  bstring("1234567890") [intExpr(  1 )] <> '1' or
@@ -506,7 +508,7 @@ const proc: check_bstring_index is func
         bstring("1234567890") [intExpr(  8 )] <> '8' or
         bstring("1234567890") [intExpr(  9 )] <> '9' or
         bstring("1234567890") [intExpr( 10 )] <> '0' then
-      writeln(" ***** STRING [ INDEX ] does not work correctly.");
+      writeln(" ***** BSTRING [ INDEX ] does not work correctly. (3)");
       okay := FALSE;
     end if;
     if  bstriExpr(bstring("1234567890")) [intExpr(  1 )] <> '1' or
@@ -519,7 +521,70 @@ const proc: check_bstring_index is func
         bstriExpr(bstring("1234567890")) [intExpr(  8 )] <> '8' or
         bstriExpr(bstring("1234567890")) [intExpr(  9 )] <> '9' or
         bstriExpr(bstring("1234567890")) [intExpr( 10 )] <> '0' then
-      writeln(" ***** STRING [ INDEX ] does not work correctly.");
+      writeln(" ***** BSTRING [ INDEX ] does not work correctly. (4)");
+      okay := FALSE;
+    end if;
+
+    aChar := bstring("1234567890") [  1 ]; ok &:= aChar = '1';
+    aChar := bstring("1234567890") [  2 ]; ok &:= aChar = '2';
+    aChar := bstring("1234567890") [  3 ]; ok &:= aChar = '3';
+    aChar := bstring("1234567890") [  4 ]; ok &:= aChar = '4';
+    aChar := bstring("1234567890") [  5 ]; ok &:= aChar = '5';
+    aChar := bstring("1234567890") [  6 ]; ok &:= aChar = '6';
+    aChar := bstring("1234567890") [  7 ]; ok &:= aChar = '7';
+    aChar := bstring("1234567890") [  8 ]; ok &:= aChar = '8';
+    aChar := bstring("1234567890") [  9 ]; ok &:= aChar = '9';
+    aChar := bstring("1234567890") [ 10 ]; ok &:= aChar = '0';
+    if not ok then
+      writeln(" ***** BSTRING [ INDEX ] does not work correctly. (5)");
+      okay := FALSE;
+    end if;
+
+    ok := TRUE;
+    aChar := bstriExpr(bstring("1234567890")) [  1 ]; ok &:= aChar = '1';
+    aChar := bstriExpr(bstring("1234567890")) [  2 ]; ok &:= aChar = '2';
+    aChar := bstriExpr(bstring("1234567890")) [  3 ]; ok &:= aChar = '3';
+    aChar := bstriExpr(bstring("1234567890")) [  4 ]; ok &:= aChar = '4';
+    aChar := bstriExpr(bstring("1234567890")) [  5 ]; ok &:= aChar = '5';
+    aChar := bstriExpr(bstring("1234567890")) [  6 ]; ok &:= aChar = '6';
+    aChar := bstriExpr(bstring("1234567890")) [  7 ]; ok &:= aChar = '7';
+    aChar := bstriExpr(bstring("1234567890")) [  8 ]; ok &:= aChar = '8';
+    aChar := bstriExpr(bstring("1234567890")) [  9 ]; ok &:= aChar = '9';
+    aChar := bstriExpr(bstring("1234567890")) [ 10 ]; ok &:= aChar = '0';
+    if not ok then
+      writeln(" ***** BSTRING [ INDEX ] does not work correctly. (6)");
+      okay := FALSE;
+    end if;
+
+    ok := TRUE;
+    aChar := bstring("1234567890") [intExpr(  1 )]; ok &:= aChar = '1';
+    aChar := bstring("1234567890") [intExpr(  2 )]; ok &:= aChar = '2';
+    aChar := bstring("1234567890") [intExpr(  3 )]; ok &:= aChar = '3';
+    aChar := bstring("1234567890") [intExpr(  4 )]; ok &:= aChar = '4';
+    aChar := bstring("1234567890") [intExpr(  5 )]; ok &:= aChar = '5';
+    aChar := bstring("1234567890") [intExpr(  6 )]; ok &:= aChar = '6';
+    aChar := bstring("1234567890") [intExpr(  7 )]; ok &:= aChar = '7';
+    aChar := bstring("1234567890") [intExpr(  8 )]; ok &:= aChar = '8';
+    aChar := bstring("1234567890") [intExpr(  9 )]; ok &:= aChar = '9';
+    aChar := bstring("1234567890") [intExpr( 10 )]; ok &:= aChar = '0';
+    if not ok then
+      writeln(" ***** BSTRING [ INDEX ] does not work correctly. (7)");
+      okay := FALSE;
+    end if;
+
+    ok := TRUE;
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  1 )]; ok &:= aChar = '1';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  2 )]; ok &:= aChar = '2';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  3 )]; ok &:= aChar = '3';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  4 )]; ok &:= aChar = '4';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  5 )]; ok &:= aChar = '5';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  6 )]; ok &:= aChar = '6';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  7 )]; ok &:= aChar = '7';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  8 )]; ok &:= aChar = '8';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr(  9 )]; ok &:= aChar = '9';
+    aChar := bstriExpr(bstring("1234567890")) [intExpr( 10 )]; ok &:= aChar = '0';
+    if not ok then
+      writeln(" ***** BSTRING [ INDEX ] does not work correctly. (8)");
       okay := FALSE;
     end if;
 
@@ -551,12 +616,12 @@ const proc: check_bstring_index is func
         not raisesIndexError(bstriExpr(bstring("1234567890")) [intExpr(           11)]) or
         not raisesIndexError(bstriExpr(bstring("1234567890")) [intExpr(           12)]) or
         not raisesIndexError(bstriExpr(bstring("1234567890")) [intExpr( integer.last)]) then
-      writeln(" ***** String indexing outside of string does not raise INDEX_ERROR.");
+      writeln(" ***** Bstring indexing outside of bstring does not raise INDEX_ERROR.");
       okay := FALSE;
     end if;
 
     if okay then
-      writeln("String indices work correctly.");
+      writeln("Bstring indices work correctly.");
     end if;
   end func;
 

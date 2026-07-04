@@ -225,9 +225,9 @@ static void type_create_call_obj (objectType destination,
     } else if (*err_info == OKAY_NO_ERROR) {
       *err_info = copy_err_info;
     } /* if */
-    logFunction(printf("type_create_call_obj -> " FMT_U_MEM "\n",
-                       (memSizeType) destination->type_of->
-                       create_call_obj););
+    logFunction(printf("type_create_call_obj -> ");
+                trace1(destination->type_of->create_call_obj);
+                printf("\n"););
   } /* type_create_call_obj */
 
 
@@ -466,7 +466,7 @@ static void old_do_create (objectType destination, objectType source,
                  !destination->type_of->is_varfunc_type &&
                  (CATEGORY_OF_OBJ(source) != MATCHOBJECT &&
                   CATEGORY_OF_OBJ(source) != CALLOBJECT &&
-                  CATEGORY_OF_OBJ(source) != ACTOBJECT))) {
+                  CATEGORY_OF_OBJ(source) != ACTENTRYOBJECT))) {
       logError(printf("old_do_create(");
                trace1(destination);
                printf(", ");
@@ -482,6 +482,13 @@ static void old_do_create (objectType destination, objectType source,
       crea_expr[2].obj = source;
       call_result = exec1(crea_expr);
       if (call_result != SYS_EMPTY_OBJECT) {
+        logError(printf("old_do_create(");
+                 trace1(destination);
+                 printf(", ");
+                 trace1(source);
+                 printf("): call_result: ");
+                 trace1(call_result);
+                 printf("\n"););
         if (fail_flag && trace.exceptions) {
           write_exception_info();
         } /* if */
@@ -554,6 +561,13 @@ void do_create (objectType destination, objectType source,
         /* printf("do_create: after exec_call\n");
            fflush(stdout); */
         if (call_result != SYS_EMPTY_OBJECT) {
+          logError(printf("do_create(");
+                   trace1(destination);
+                   printf(", ");
+                   trace1(source);
+                   printf("): call_result: ");
+                   trace1(call_result);
+                   printf("\n"););
           if (fail_flag && trace.exceptions) {
             write_exception_info();
           } /* if */
@@ -1462,11 +1476,20 @@ boolType arr_elem_initialisation (typeType dest_type, objectType obj_to, objectT
     errInfoType err_info = OKAY_NO_ERROR;
 
   /* arr_elem_initialisation */
+    logFunction(printf("arr_elem_initialisation(");
+                printtype(dest_type);
+                printf(", " FMT_U_MEM ", " FMT_U_MEM " ",
+                       (memSizeType) obj_to, (memSizeType) obj_from);
+                trace1(obj_from);
+                printf("\n"););
     obj_to->descriptor.property = NULL;
     INIT_VAR_EMBEDDED(obj_to, DECLAREDOBJECT);
     obj_to->type_of = dest_type;
     temp_flag_obj_from = TEMP_OBJECT(obj_from);
     CLEAR_TEMP_FLAG(obj_from);
+    if (temp_flag_obj_from) {
+      SET_TEMP2_FLAG(obj_from);
+    } /* if */
     do_create(obj_to, obj_from, &err_info);
     SET_ANY_FLAG(obj_from, temp_flag_obj_from);
     return err_info == OKAY_NO_ERROR;

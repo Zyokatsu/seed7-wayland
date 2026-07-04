@@ -1,7 +1,8 @@
 /********************************************************************/
 /*                                                                  */
 /*  heaputl.h     Functions for heap allocation and maintenance.    */
-/*  Copyright (C) 1989 - 2019  Thomas Mertes                        */
+/*  Copyright (C) 1989 - 2008, 2010, 2011, 2013  Thomas Mertes      */
+/*                2015, 2019, 2022, 2025, 2026  Thomas Mertes       */
 /*                                                                  */
 /*  This file is part of the Seed7 Runtime Library.                 */
 /*                                                                  */
@@ -24,11 +25,11 @@
 /*                                                                  */
 /*  Module: Seed7 Runtime Library                                   */
 /*  File: seed7/src/heaputl.h                                       */
-/*  Changes: 1992 - 1994, 2008, 2010, 2011  Thomas Mertes           */
+/*  Changes: 2008, 2010, 2011, 2013, 2015, 2019  Thomas Mertes      */
+/*           2022, 2025, 2026  Thomas Mertes                        */
 /*  Content: Functions for heap allocation and maintenance.         */
 /*                                                                  */
 /********************************************************************/
-
 
 #if DO_HEAP_STATISTIC
 typedef struct {
@@ -67,6 +68,7 @@ typedef struct {
     unsigned long block;
     unsigned long loclist;
     unsigned long infil;
+    unsigned long name_cache;
     unsigned long parseError;
     unsigned long prog;
     unsigned long polldata;
@@ -78,6 +80,7 @@ typedef struct {
     memSizeType fetch_data_bytes;
     unsigned long sql_func;
     unsigned long files;
+    unsigned long sockets;
     unsigned long win;
     memSizeType win_bytes;
     unsigned long process;
@@ -94,13 +97,14 @@ countType count = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                   0, 0, 0, 0};
+                   0, 0, 0, 0, 0, 0};
 #else
 EXTERN countType count;
 #endif
 
 extern size_t sizeof_pollRecord;
 extern size_t sizeof_processRecord;
+extern size_t sizeof_nameCacheEntryRecord;
 #endif
 
 #if DO_HEAP_STATISTIC || DO_HEAPSIZE_COMPUTATION || DO_HEAP_CHECK
@@ -366,21 +370,23 @@ EXTERN memSizeType hs;
 #if ALLOW_STRITYPE_SLICES
 #define HEAP_ALLOC_STRI(var,cap)             (ALLOC_HEAP(var,striType,SIZ_STRI(cap))?((var)->mem=(var)->mem1,(var)->capacity=(cap),CNT(CNT1_STRI(cap,SIZ_STRI(cap))) TRUE):FALSE)
 #define HEAP_REALLOC_STRI(v1,v2,unused,cap)  if((v1=REALLOC_HEAP(v2,striType,SIZ_STRI(cap)))!=NULL){CNT(COUNT3_STRI((v1)->capacity,cap))(v1)->mem=(v1)->mem1,(v1)->capacity=(cap);}
+#define HEAP_ALLOC_EMPTY_STRI(var)           (ALLOC_HEAP(var,emptyStriType,SIZ_STRI_0)?((var)->mem=(strElemType *)&(var),(var)->capacity=0,CNT(CNT1_STRI(0,SIZ_STRI_0)) TRUE):FALSE)
 #else
 #define HEAP_ALLOC_STRI(var,cap)             (ALLOC_HEAP(var,striType,SIZ_STRI(cap))?((var)->capacity=(cap),CNT(CNT1_STRI(cap,SIZ_STRI(cap))) TRUE):FALSE)
 #define HEAP_REALLOC_STRI(v1,v2,unused,cap)  if((v1=REALLOC_HEAP(v2,striType,SIZ_STRI(cap)))!=NULL){CNT(COUNT3_STRI((v1)->capacity,cap))(v1)->capacity=(cap);}
-#endif
 #define HEAP_ALLOC_EMPTY_STRI(var)           (ALLOC_HEAP(var,emptyStriType,SIZ_STRI_0)?((var)->capacity=0,CNT(CNT1_STRI(0,SIZ_STRI_0)) TRUE):FALSE)
+#endif
 #define HEAP_FREE_STRI(var, unused)          (CNT(CNT2_STRI((var)->capacity,SIZ_STRI((var)->capacity))) FREE_HEAP(var,SIZ_STRI((var)->capacity)))
 #else
 #if ALLOW_STRITYPE_SLICES
 #define HEAP_ALLOC_STRI(var,len)             (ALLOC_HEAP(var,striType,SIZ_STRI(len))?((var)->mem=(var)->mem1,CNT(CNT1_STRI(len,SIZ_STRI(len))) TRUE):FALSE)
 #define HEAP_REALLOC_STRI(v1,v2,l1,l2)       if((v1=REALLOC_HEAP(v2,striType,SIZ_STRI(l2)))!=NULL){CNT(COUNT3_STRI(l1,l2))(v1)->mem=(v1)->mem1;}
+#define HEAP_ALLOC_EMPTY_STRI(var)           (ALLOC_HEAP(var,emptyStriType,SIZ_STRI_0)?((var)->mem=(strElemType *)&(var),CNT(CNT1_STRI(0,SIZ_STRI_0)) TRUE):FALSE)
 #else
 #define HEAP_ALLOC_STRI(var,len)             (ALLOC_HEAP(var,striType,SIZ_STRI(len))?(CNT(CNT1_STRI(len,SIZ_STRI(len))) TRUE):FALSE)
 #define HEAP_REALLOC_STRI(v1,v2,l1,l2)       if((v1=REALLOC_HEAP(v2,striType,SIZ_STRI(l2)))!=NULL){COUNT3_STRI(l1,l2);}
-#endif
 #define HEAP_ALLOC_EMPTY_STRI(var)           (ALLOC_HEAP(var,emptyStriType,SIZ_STRI_0)?(CNT(CNT1_STRI(0,SIZ_STRI_0)) TRUE):FALSE)
+#endif
 #define HEAP_FREE_STRI(var, len)             (CNT(CNT2_STRI(len,SIZ_STRI(len))) FREE_HEAP(var,SIZ_STRI(len)))
 #endif
 
@@ -512,19 +518,21 @@ EXTERN unsigned int sflist_allowed;
 #define SLICE_OVERLAPPING(var,dest)            ((var)->mem>=(dest)->mem1&&(var)->mem<&(dest)->mem1[(dest)->size])
 #define SET_SLICE_CAPACITY(var,cap)
 #endif
+#define SET_SLICE_EMPTY(var)                   ((var)->mem = (strElemType *) (var), (var)->size = 0)
 #endif
 
 
 #if ALLOW_BSTRITYPE_SLICES
 #define ALLOC_BSTRI_SIZE_OK(var,len)       (ALLOC_HEAP(var, bstriType, SIZ_BSTRI(len))?((var)->mem = (var)->mem1, CNT(CNT1_BSTRI(len, SIZ_BSTRI(len))) TRUE):FALSE)
 #define REALLOC_BSTRI_SIZE_OK(v1,v2,l1,l2) ((v1=REALLOC_HEAP(v2, bstriType, SIZ_BSTRI(l2)))?((v1)->mem=(v1)->mem1,0):0)
+#define ALLOC_EMPTY_BSTRI(var)             (ALLOC_HEAP(var, emptyBStriType, SIZ_BSTRI_0)?((var)->mem = (ucharType *)&(var), CNT(CNT1_BSTRI(0, SIZ_BSTRI_0)) TRUE):FALSE)
 #else
 #define ALLOC_BSTRI_SIZE_OK(var,len)       (ALLOC_HEAP(var, bstriType, SIZ_BSTRI(len))?(CNT(CNT1_BSTRI(len, SIZ_BSTRI(len))) TRUE):FALSE)
 #define REALLOC_BSTRI_SIZE_OK(v1,v2,l1,l2) (v1=REALLOC_HEAP(v2, bstriType, SIZ_BSTRI(l2)),0)
+#define ALLOC_EMPTY_BSTRI(var)             (ALLOC_HEAP(var, emptyBStriType, SIZ_BSTRI_0)?(CNT(CNT1_BSTRI(0, SIZ_BSTRI_0)) TRUE):FALSE)
 #endif
 
 #define ALLOC_BSTRI_CHECK_SIZE(var,len)       ((len) <= MAX_BSTRI_LEN?ALLOC_BSTRI_SIZE_OK(var, len):(var=NULL,FALSE))
-#define ALLOC_EMPTY_BSTRI(var)                (ALLOC_HEAP(var, emptyBStriType, SIZ_BSTRI_0)?(CNT(CNT1_BSTRI(0, SIZ_BSTRI_0)) TRUE):FALSE)
 #define FREE_BSTRI(var,len)                   (CNT(CNT2_BSTRI(len, SIZ_BSTRI(len))) FREE_HEAP(var, SIZ_BSTRI(len)))
 #define REALLOC_BSTRI_CHECK_SIZE(v1,v2,l1,l2) ((l2)  <= MAX_BSTRI_LEN?REALLOC_BSTRI_SIZE_OK(v1,v2,l1,l2):(v1=NULL,0))
 #define COUNT3_BSTRI(len1,len2)               CNT3(CNT2_BSTRI(len1, SIZ_BSTRI(len1)), CNT1_BSTRI(len2, SIZ_BSTRI(len2)))
@@ -614,14 +622,6 @@ EXTERN unsigned int sflist_allowed;
 #define COUNT3_TABLE(tp,nr1,nr2)    CNT3(CNT2_BYT(SIZ_TAB(tp, nr1)), CNT1_BYT(SIZ_TAB(tp, nr2)))
 
 
-void setupStack (memSizeType stackSize);
-boolType resizeCatchStackOkay (void);
-void resize_catch_stack (void);
-void no_memory (const_cstriType source_file, int source_line);
-#if CHECK_STACK
-boolType checkStack (boolType inLogMacro);
-memSizeType getMaxStackSize (void);
-#endif
 #if WITH_STRI_CAPACITY
 striType growStri (striType stri, memSizeType len);
 striType shrinkStri (striType stri, memSizeType len);
@@ -629,6 +629,7 @@ striType shrinkStri (striType stri, memSizeType len);
 #if DO_HEAP_CHECK
 void check_heap (long, const char *, unsigned int);
 #endif
+NORETURN void no_memory (const_cstriType source_file, int source_line);
 #if !DO_HEAP_STATISTIC
 void heapStatistic (void);
 #endif
