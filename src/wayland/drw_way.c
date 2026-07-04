@@ -48,6 +48,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "magic_kernel.h"
 
 /*#include "stdio.h"
 #include "limits.h"*/
@@ -58,6 +59,7 @@ void gkbInitKeyboard (void);
 --------------------------------------*/
 #define PI  3.141592653589793238462643383279502884197
 #define PI2 6.283185307179586476925286766559005768394
+#define MAX_LIGHT_F 65535.0
 // Uncomment the following directive to enable alpha support (in colours).
 // #define USE_ALPHA 1
 static winType globalEmptyWindow = 0;
@@ -325,7 +327,7 @@ the Wayland server.
 void drawRawPoint (way_winType window, intType x, intType y, intType col)
 {
   intType pos = y*window->buffer->width + x;
-  if (pos < window->buffer->width * window->buffer->height)
+  if (pos >= 0 && pos < window->buffer->width * window->buffer->height)
     window->buffer->content[pos] = col;
 }
 
@@ -340,16 +342,19 @@ void drawRawLine (way_winType window, intType x1, intType y1, intType x2, intTyp
 
   if (slope == 0)
   { if (y1 == y2) // Horizontal line.
-      do
-      { pos = y1 * window->buffer->width + xPos;
-        if (pos < maxPos)
-        { window->buffer->content[pos] = col;
-          xPos += x1 < x2 ? 1 : -1;
-        }
-        else
-          break;
-      } while (x1 <= x2 && xPos <= x2 || x1 > x2 && xPos >= x2);
+    { if (y1 >= 0 && y1 < window->buffer->height)
+        do
+        { pos = y1 * window->buffer->width + xPos;
+          if (xPos >= 0 && xPos < window->buffer->width)
+          { window->buffer->content[pos] = col;
+            xPos += x1 < x2 ? 1 : -1;
+          }
+          else
+            break;
+        } while (x1 <= x2 && xPos <= x2 || x1 > x2 && xPos >= x2);
+    }
     else // Vertical line.
+    if (x1 >= 0 && x1 < window->buffer->width)
       do
       { pos = yPos * window->buffer->width + x1;
         if (pos < maxPos)
@@ -381,7 +386,7 @@ void drawRawLine (way_winType window, intType x1, intType y1, intType x2, intTyp
       check = dy*2 - dx;
       for (xPos = x1, yPos = y1; xPos <= x2; xPos++)
       { pos = yPos*window->buffer->width + xPos;
-        if (pos < maxPos)
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
           window->buffer->content[pos] = col;
         if (check > 0)
         { yPos += adjuster;
@@ -409,7 +414,7 @@ void drawRawLine (way_winType window, intType x1, intType y1, intType x2, intTyp
       check = dx*2 - dy;
       for (xPos = x1, yPos = y1; yPos <= y2; yPos++)
       { pos = yPos*window->buffer->width + xPos;
-        if (pos < maxPos)
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
           window->buffer->content[pos] = col;
         if (check > 0)
         { xPos += adjuster;
@@ -502,28 +507,34 @@ void drawRawArc
   { // Using the coordinate, render the eight mirrored points when appropriate.
     // Render right, downward A (plunges from the middle)
     xPos = x + xd; yPos = y + yd; pos = yPos*window->buffer->width + xPos; angle = PI2 - ((float)yd / (float)xd) * Turn8;
-      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    if (pos > 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width &&
+    ( !crossingBound && angle >= startAngle && angle <= endAngle ||
+      crossingBound && (angle <= startAngle || angle >= endAngle)
+    )) window->buffer->content[pos] = col;
     // Render right, upward A (rises from the middle)
     yPos = y - yd; pos = yPos*window->buffer->width + xPos; angle = ((float)yd / (float)xd) * Turn8;
-      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+    if (pos > 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width &&
+    ( !crossingBound && angle >= startAngle && angle <= endAngle ||
+      crossingBound && (angle <= startAngle || angle >= endAngle)
+    )) window->buffer->content[pos] = col;
     // Render left, upward A
     xPos = x - xd; pos = yPos*window->buffer->width + xPos; angle = PI - ((float)yd / (float)xd) * Turn8;
-      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+      if (pos > 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
     // Render left, downward A (these first four draw the "parenthesis" portion: ( )
     yPos = y + yd; pos = yPos*window->buffer->width + xPos; angle = PI + ((float)yd / (float)xd) * Turn8;
-      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+      if (pos > 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
     // Render right, downard B (touches the bottom)
     xPos = x + yd; yPos = y + xd; pos = yPos*window->buffer->width + xPos; angle = PI2*0.75 + ((float)yd / (float)xd) * Turn8;
-      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+      if (pos > 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
     // Render right, upward B (touches the top)
     yPos = y - xd; pos = yPos*window->buffer->width + xPos; angle = PI*0.5 - ((float)yd / (float)xd) * Turn8;
-      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+      if (pos > 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
     // Render left, upward B
     xPos = x - yd; pos = yPos*window->buffer->width + xPos; angle = PI*0.5 + ((float)yd / (float)xd) * Turn8;
-      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+      if (pos > 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
     // Render left, downward B
     yPos = y + xd; pos = yPos*window->buffer->width + xPos; angle = PI2*0.75 - ((float)yd / (float)xd) * Turn8;
-      if (pos < maxPos && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
+      if (pos > 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width && (!crossingBound && angle >= startAngle && angle <= endAngle || crossingBound && (angle <= startAngle || angle >= endAngle))) window->buffer->content[pos] = col;
 
     // Adjust position.
     yd += 1;
@@ -812,7 +823,7 @@ void drwFPolyLine (const_winType actual_window, intType x, intType y, bstriType 
 
           for (yPos = top; yPos < bottom; yPos++)
             for (xPos = left, pos = yPos * window->buffer->width + xPos; xPos < right; xPos++, pos++)
-              if (pos < maxPos)
+              if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
               { // Check to see if the point is within the polygon.
                 contained = false;
                 for (point = 0, countCorner = false; point+1 < numCoords; point+=2, countCorner = !countCorner)
@@ -1191,28 +1202,36 @@ void drwPCircle (const_winType actual_window, intType x, intType y, intType radi
       { // Using the coordinate, render the eight mirrored points.
         // Render right, downward A (plunges from the middle)
         xPos = x + xd; yPos = y + yd; pos = yPos*window->buffer->width + xPos;
-          if (pos < maxPos) window->buffer->content[pos] = col;
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
+          window->buffer->content[pos] = col;
         // Render right, upward A (rises from the middle)
         yPos = y - yd; pos = yPos*window->buffer->width + xPos;
-          if (pos < maxPos) window->buffer->content[pos] = col;
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
+          window->buffer->content[pos] = col;
         // Render left, upward A
         xPos = x - xd; pos = yPos*window->buffer->width + xPos;
-          if (pos < maxPos) window->buffer->content[pos] = col;
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
+          window->buffer->content[pos] = col;
         // Render left, downward A (these first four draw the "parenthesis" portion: ( )   ;)
         yPos = y + yd; pos = yPos*window->buffer->width + xPos;
-          if (pos < maxPos) window->buffer->content[pos] = col;
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
+          window->buffer->content[pos] = col;
         // Render right, downard B (touches the bottom)
         xPos = x + yd; yPos = y + xd; pos = yPos*window->buffer->width + xPos;
-          if (pos < maxPos) window->buffer->content[pos] = col;
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
+          window->buffer->content[pos] = col;
         // Render right, upward B (touches the top)
         yPos = y - xd; pos = yPos*window->buffer->width + xPos;
-          if (pos < maxPos) window->buffer->content[pos] = col;
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
+          window->buffer->content[pos] = col;
         // Render left, upward B
         xPos = x - yd; pos = yPos*window->buffer->width + xPos;
-          if (pos < maxPos) window->buffer->content[pos] = col;
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
+          window->buffer->content[pos] = col;
         // Render left, downward B
         yPos = y + xd; pos = yPos*window->buffer->width + xPos;
-          if (pos < maxPos) window->buffer->content[pos] = col;
+        if (pos >= 0 && pos < maxPos && xPos >= 0 && xPos < window->buffer->width)
+          window->buffer->content[pos] = col;
 
         // Adjust position.
         yd += 1;
@@ -1722,28 +1741,28 @@ void drwPFCircle
         x1 = x - xd; yPos = y - yd;
         x2 = x + xd;
         for (intType z = 0, pos = yPos*window->buffer->width + x1; z <= x2-x1; z++, pos++)
-          if (pos < maxPos)
+          if (pos >= 0 && pos < maxPos && x1+z >= 0 && x1+z < window->buffer->width)
             window->buffer->content[pos] = col;
 
         // Render inner, downward
         x1 = x - xd; yPos = y + yd;
         x2 = x + xd;
         for (intType z = 0, pos = yPos*window->buffer->width + x1; z <= x2-x1; z++, pos++)
-          if (pos < maxPos)
+          if (pos >= 0 && pos < maxPos && x1+z >= 0 && x1+z < window->buffer->width)
             window->buffer->content[pos] = col;
 
         // Render outer, upward
         x1 = x - yd; yPos = y - xd;
         x2 = x + yd;
         for (intType z = 0, pos = yPos*window->buffer->width + x1; z <= x2-x1; z++, pos++)
-          if (pos < maxPos)
+          if (pos >= 0 && pos < maxPos && x1+z >= 0 && x1+z < window->buffer->width)
             window->buffer->content[pos] = col;
 
         // Render outer, downward
         x1 = x - yd; yPos = y + xd;
         x2 = x + yd;
         for (intType z = 0, pos = yPos*window->buffer->width + x1; z <= x2-x1; z++, pos++)
-          if (pos < maxPos)
+          if (pos >= 0 && pos < maxPos && x1+z >= 0 && x1+z < window->buffer->width)
             window->buffer->content[pos] = col;
 
         // Adjust position.
@@ -1939,7 +1958,7 @@ void drwPFEllipse
 // Copied from drw_emc.c
 void drwPixelToRgb (intType col, intType *redLight, intType *greenLight, intType *blueLight)
 {
-  *redLight   = (intType) (( ((uintType) col) >> 16       ) << 8);
+  *redLight   = (intType) (((((uintType) col) >> 16) & 255) << 8);
   *greenLight = (intType) (((((uintType) col) >>  8) & 255) << 8);
   *blueLight  = (intType) (( ((uintType) col)        & 255) << 8);
 }
@@ -2064,7 +2083,7 @@ void drwPPoint (const_winType actual_window, intType x, intType y, intType col)
   { window = (way_winType) actual_window;
     pos = y*window->width + x;
 
-    if (pos < window->width * window->height && prepare_buffer_copy(&waylandState, window))
+    if (pos >= 0 && pos < window->width * window->height && prepare_buffer_copy(&waylandState, window))
     { window->buffer->content[pos] = col;
 
       if (!window->isPixmap)
@@ -2104,7 +2123,9 @@ void drwPRect (const_winType actual_window, intType x, intType y, intType width,
         { int pos = yPos*window->buffer->width + xPos;
 
           if (pos < window->buffer->width * window->buffer->height)
-            window->buffer->content[pos] = col;
+          { if (pos >= 0 && xPos >= 0 && xPos < window->buffer->width)
+              window->buffer->content[pos] = col;
+          }
           else
             goto End;
         }
@@ -2136,12 +2157,16 @@ void drwPut (const_winType destWindow, intType xDest, intType yDest, const_winTy
       source->buffer && source->buffer->content &&
       prepare_buffer_copy(&waylandState, destination)
     )
-    { // Copy the data to the destination.
-      for (int y = 0; y < source->buffer->height && y+yDest < destination->height; y++)
-        for (int x = 0; x < source->buffer->width && x+xDest < destination->width; x++)
-        { int pos = y * source->buffer->width + x;
-          int dx = xDest + x,
-              dy = yDest + y,
+    { intType xBase = 0, yBase = 0,
+        width = source->buffer->width,
+        height = source->buffer->height;
+      clamp_common_area(source, destination, &xBase, &yBase, &width, &height, &xDest, &yDest);
+      // Copy the data to the destination.
+      for (intType y = yBase; y < height; y++)
+        for (intType x = xBase; x < width; x++)
+        { intType pos = y * source->buffer->width + x;
+          intType dx = xDest + x - xBase,
+              dy = yDest + y - yBase,
               dpos = dy * destination->buffer->width + dx;
           destination->buffer->content[dpos] = source->buffer->content[pos];
         }
@@ -2158,7 +2183,48 @@ void drwPut (const_winType destWindow, intType xDest, intType yDest, const_winTy
   }
 }
 
-// Unfinished. Needs downscaling.
+float *buffer_to_float_map (uint32_t *content, size_t area)
+{
+  intType red, green, blue;
+  float *map = malloc(area * sizeof(float) * 4);
+
+  if (map)
+  { for (size_t pos = 0, index = 0; index < area; pos += 4, index++)
+    { drwPixelToRgb(content[index], &red, &green, &blue);
+      map[pos] = (float)(red) / MAX_LIGHT_F;
+      map[pos+1] = (float)(green) / MAX_LIGHT_F;
+      map[pos+2] = (float)(blue) / MAX_LIGHT_F;
+#ifdef USE_ALPHA
+      map[pos+3] = (float)(((((uintType) content[index]) >> 24) & 255) << 8) / MAX_LIGHT_F;
+#else
+      map[pos+3] = 1.0; // Alpha.
+#endif
+    }
+    return map;
+  }
+  else
+  { raise_error(MEMORY_ERROR);
+    return 0;
+  }
+}
+
+void apply_float_map_to_buffer (float *map, intType mapWidth, intType mapHeight, uint32_t *buffer, intType xDest, intType yDest, int bufferWidth, int bufferHeight)
+{
+  for (intType y = 0; y < mapHeight; y++)
+    for (intType x = 0; x < mapWidth; x++)
+    { intType pos = y * mapWidth * 4 + x * 4;
+      if (x+xDest >= 0 && x+xDest < bufferWidth && y+yDest >= 0 && y+yDest < bufferHeight)
+      { size_t dx = xDest + x,
+               dy = yDest + y,
+               dpos = dy * bufferWidth + dx;
+        buffer[dpos] = drwRgbColor(map[pos]*MAX_LIGHT_F, map[pos+1]*MAX_LIGHT_F, map[pos+2]*MAX_LIGHT_F);
+      }
+      else
+      if (x+xDest >= bufferWidth)
+        break;
+    }
+}
+
 void drwPutScaled
 ( const_winType destWindow,
   intType xDest,
@@ -2209,9 +2275,8 @@ void drwPutScaled
         int xDelay = -1, yDelay = -1;
         if (xDelayRate > 0.00001)
           xDelay = 1.0 / xDelayRate;
-        if (yDelay > 0.00001)
+        if (yDelayRate > 0.00001)
           yDelay = 1.0 / yDelayRate;
-        // printf("xScale: %f  span: %d  delay: %d\n", xScale, xSpan, xDelay);
         for (int y = 0, dy = 0, yStep=0; y < source->buffer->height && yDest+dy < destination->height; y++)
         { // If the delay has been fulfilled, up the span for this loop.
           if (yStep == yDelay-1)
@@ -2244,6 +2309,29 @@ void drwPutScaled
           else
             yStep++;
         }
+      }
+      else // For any other scaling (being downscaling) use Magic Kernel Sharp 2013
+      { float *sourceMap = buffer_to_float_map(source->buffer->content, source->buffer->width * source->buffer->height),
+          *scaledMap = malloc(sizeof(float) * 4 * width * height);
+        if (sourceMap && scaledMap)
+        { struct MagicKernelParams params;
+          params.src = sourceMap;
+          params.src_w = source->buffer->width;
+          params.src_h = source->buffer->height;
+          params.src_c = 4; // Red, green, blue and alpha.
+          params.from = 0;
+          params.to = height;
+          params.dst = scaledMap;
+          params.dst_w = width;
+          params.dst_h = height;
+          params.dst_c = 4;
+          magic_kernel_resize(&params);
+          apply_float_map_to_buffer(scaledMap, width, height, destination->buffer->content, xDest, yDest, destination->buffer->width, destination->buffer->height);
+          free(sourceMap);
+          free(scaledMap);
+        }
+        else
+          raise_error(MEMORY_ERROR);
       }
 
       // If the destination is a Wayland window, send the data.
