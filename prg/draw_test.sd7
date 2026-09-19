@@ -1,0 +1,181 @@
+$ include "seed7_05.s7i";
+  include "keybd.s7i";
+  include "draw.s7i";
+  include "time.s7i";
+  include "text.s7i";
+  include "stdfont10.s7i";
+
+const proc: main () is func
+  local
+    var char: character is ' ';
+    var array array pixel: pixels is 0 times 0 times pixel.value;
+    var pixel: px is pixel.value;
+    var color: colour is Black;
+    var integer: line is 0;
+    #var string: text is "";
+    var PRIMITIVE_WINDOW: buffer is PRIMITIVE_WINDOW.value;
+    var time: startTime is time.value;
+    var text: textArea is text.value;
+  begin
+    KEYBOARD := GRAPH_KEYBOARD;
+    writeln("Screen: " <& screenWidth <& " x " <& screenHeight);
+    screen(600, 400);
+    clear(curr_win, Black);
+    point(10, 10, Red);
+    point(15, 10, Green);
+    point(20, 10, Blue);
+    box(50, 10, 50, 10, Yellow);
+    circle(400, 200, 20, Green);
+    fcircle(400, 100, 40, Green);
+    arc(100, 100, 20, 0.5*PI, 1.75*PI, Red);
+    arc(100, 300, 20, 0.5*PI, 1.75*PI, 16, Red);
+      circle(100, 350, 21, White);
+      line(100, 328, 0, 44, White);
+      line(101, 328, 0, 44, Green);
+    arc(100, 350, 20, 0.5*PI, 2.0*PI, 20, Red);
+    arc(150, 300, 20, 0.5*PI, 1.75*PI, 5, Red);
+    arc(150, 300, 20, 0.5*PI, 1.75*PI, Green);
+    arc(200, 300, 80, 0.5*PI, 1.75*PI, 70, Green);
+    pieslice(300, 150, 80, 0.5*PI, -1.75*PI, Purple);
+    #line(300, 150, 70, 70, Red);
+    #fcircle(300, 250, 40, Purple);
+    line(0, 100, 50, 0, Yellow); # Marker.
+    line(100, 150, 40, 70, White);
+    line(100, 150, 10, -70, White);
+    line(140, 220, -60, 10, White);
+    polyLine(50, 50, genPointList([](20,20,  10,10, 50, -10, 60, 0)), Purple);
+    line(25, 55, 100, 0, White);
+    polyLine(150, 50, genPointList([](20,20,  10,10, 50, -10, 60, 0)), Yellow); # Should be covered.
+    fpolyLine(150, 50, genPointList([](20,20,  10,10, 50, -10, 60, 0)), Purple);
+    polyLine(150, 50, genPointList([](20,20,  10,10, 50, -10, 60, 0)), Blue);
+    fpolyLine(250, 20, genPointList([](20,20,  10,10, 50, -10, 60, 0, 80,30, 60,25, 50,30)), Purple);
+    polyLine(250, 20, genPointList([](20,20,  10,10, 50, -10, 60, 0, 80,30, 60,25, 50,30)), Red);
+    fellipse(300, 200, 80, 40, Green);
+    fellipse(350, 300, 45, 2, Green);
+    line(350, 305, 45, 0, Green);
+    rect(350, 310, 45, 3, Green);
+    fellipse(550, 350, 120, 20, Green);
+    fellipse(400, 250, 1, 45, Green);
+    # writeln("90 = " <& (PI/2.0) <& "  270 = " <& (PI*1.5));
+    chord(500, 50, 20, PI/2.0, -PI, Yellow);
+    chord(500, 100, 20, 0.0, PI, Yellow);
+    chord(500, 150, 20, PI, PI, Yellow);
+    chord(500, 200, 20, 0.75*PI, 0.25*PI, Yellow);
+    chord(500, 250, 20, 0.0, 0.25*PI, Yellow);
+    chord(500, 300, 20, 0.0, 1.5*PI, Yellow);
+    chord(500, 350, 20, PI, 1.3*PI, Yellow);
+    #chord(500, 380, 1, 0.0, 1.5*PI, Yellow);
+
+    pixels := getPixelArray(curr_win);
+    buffer := getPixmap(pixels);
+    put(300, 350, buffer);
+
+    buffer := newPixmap(100,100);
+    clear(buffer, Red);
+    setContent(curr_win, buffer);
+
+    buffer := getPixmap(curr_win, 300, -20, 100, 100);
+    box(buffer, 0, 0, 100, 100, Green);
+    circle(buffer, 0, 0, 50, Blue);
+    put(curr_win, 400, 200, 50, 50, buffer);
+    put(curr_win, 0, 300, buffer);
+
+    buffer := newPixmap(100, 100);
+    clear(buffer, Black);
+    copyArea(curr_win, buffer, 40, 40, 100, 100, 10, -10);
+    box(buffer, 0, 0, 100, 100, Green);
+    put(360, 10, buffer);
+
+    textArea := openPixmapFontFile(curr_win);
+    setFont(textArea, stdFont10);
+    setPosXY(textArea, 6, 50);
+    write(textArea, " !\"#$%&'()*+,-./0123456789:;<=>?");
+
+    (*buffer := getPixmap(curr_win, 300, -20, 100, 100);
+    box(buffer, 0, 0, 100, 100, Green);
+    put(0, 300, buffer);*)
+
+    (*pixels := getPixelArray(curr_win);
+    writeln("height: " <& length(pixels));
+    for line range 9 to 11 do
+      writeln("width: " <& length(pixels[line]));
+      text &:= str(line) & ":\n";
+      for px range pixels[line] do
+        colour := pixelToColor(px);
+        text &:= str(colour.redLight);
+        text &:= str(colour.greenLight);
+        text &:= str(colour.blueLight);
+      end for;
+      text &:= "\n\n";
+    end for;
+    writeln(text);*)
+    selectInput(curr_win, KEY_CLOSE, TRUE);
+
+    repeat
+      character := getc(KEYBOARD);
+      writeln(str(ord(character))); # 114112
+      case character of
+        when {'a' .. 'z'} | {'A' .. 'Z'} | {'0' .. '9'}:
+          writeln(str(character));
+        when {KEY_BS}:
+          writeln("Backspace / Ctl + H");
+        when {KEY_ALT_A}:
+          writeln("Alt + A");
+        when {KEY_ALT_0}:
+          writeln("Alt + 0");
+        when {KEY_CLOSE}:
+          writeln("Close requested.");
+          exit(0);
+        when {KEY_CTL_A}:
+          writeln("Ctl + A");
+        when {KEY_CTL_0}:
+          writeln("Ctl + 0");
+        when {KEY_CTL_I}:
+          writeln("Ctl + I");
+        when {KEY_CTL_J}:
+          writeln("Ctl + J");
+        when {KEY_SHIFT}:
+          writeln("Shift");
+        when {KEY_LEFT_SHIFT}:
+          writeln("Left-Shift");
+        when {KEY_RIGHT_SHIFT}:
+          writeln("Right-Shift");
+      end case;
+      if buttonPressed(KEYBOARD, 'a') then
+        writeln("  A");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_CONTROL) then
+        writeln("  control");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_LEFT_CONTROL) then
+        writeln("  left-control");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_RIGHT_CONTROL) then
+        writeln("  right-control");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_CTL_A) then
+        writeln("  control-A");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_CTL_H) then
+        writeln("  control-H");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_BS) then
+        writeln("  backspace");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_CTL_BS) then
+        writeln("  control-backspace");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_NUM_LOCK) then
+        writeln("  num-lock");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_NUM_LOCK_ON) then
+        writeln("  num-lock-on");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_MOUSE1) then
+        writeln("  mouse-1");
+      end if;
+      if buttonPressed(KEYBOARD, KEY_SFT_MOUSE1) then
+        writeln("  shift-mouse-1");
+      end if;
+    until character = 'q';
+  end func;
