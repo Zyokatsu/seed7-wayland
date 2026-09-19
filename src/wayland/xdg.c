@@ -50,7 +50,7 @@ void xdg_toplevel_close (void *data, struct xdg_toplevel *xdg_toplevel)
     exit(0);
   else
   if (window->close_action == CLOSE_BUTTON_RETURNS_KEY)
-    expand_key_history(data, K_CLOSE);
+    expand_key_history(&waylandState, K_CLOSE);
 }
 
 const struct xdg_toplevel_listener xdgToplevelListener =
