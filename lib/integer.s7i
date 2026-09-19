@@ -132,7 +132,9 @@ const func integer: (in integer: dividend) rem (in integer: divisor)   is action
 
 
 (**
- *  Integer division truncated towards negative infinity.
+ *  Integer division truncated towards negative infinity (floor division).
+ *  It corresponds to round(floor(float(dividend) / float(divisor))).
+ *  The actual implementation does not use floating point operations.
  *  The modulo (remainder) of this division is computed with ''mod''.
  *  Therefore this division is called modulo division (''mdiv'').
  *  For the operations ''mdiv'' and ''mod'' holds for all A:
@@ -159,6 +161,22 @@ const func integer: (in integer: dividend) mdiv (in integer: divisor)  is action
  *  @exception OVERFLOW_ERROR If an integer overflow occurs.
  *)
 const func integer: (in integer: dividend) mod (in integer: divisor)   is action "INT_MOD";
+
+
+(**
+ *  Integer division rounded up towards positive infinity (ceil division).
+ *  It corresponds to round(ceil(float(dividend) / float(divisor))).
+ *  The actual implementation does not use floating point operations.
+ *  For the operations ''ceilDiv'', ''mdiv'' and ''mod'' holds for all A:
+ *   A ceilDiv B = -(-A mdiv B)
+ *   A ceilDiv B = -(A mdiv -B)
+ *   (A ceilDiv B) * B + A mod -B = A      when B <> 0
+ *   -A ceilDiv B = A ceilDiv -B           when B <> 0
+ *  @return the quotient of the integer ceil division.
+ *  @exception NUMERIC_ERROR If a division by zero occurs.
+ *  @exception OVERFLOW_ERROR If an integer overflow occurs.
+ *)
+const func integer: (in integer: dividend) ceilDiv (in integer: divisor) is action "INT_CEIL_DIV";
 
 
 (**

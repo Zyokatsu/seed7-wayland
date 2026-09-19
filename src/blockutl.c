@@ -68,20 +68,14 @@ void free_locobj (const_locObjType locobj)
           CATEGORY_OF_OBJ(locobj->object) == RESULTOBJECT ||
           CATEGORY_OF_OBJ(locobj->object) == LOCALVOBJECT) {
         if (locobj->init_value != NULL) {
-          if (CATEGORY_OF_OBJ(locobj->object) == RESULTOBJECT) {
-            /* printf("free_locobj: RESULTOBJECT init category %u\n",
-               CATEGORY_OF_OBJ(locobj->init_value)); */
-            free_expression(locobj->init_value);
-          } else {
-            /* prot_cstri("free_locobj value ");
-            prot_int((intType) locobj->init_value);
-            prot_cstri(" ");
-            trace1(locobj->init_value);
-            prot_nl(); */
-            destroy_local_init_value(locobj, &err_info);
-            FREE_OBJECT(locobj->init_value);
-            /* dump_any_temp(locobj->init_value); */
-          } /* if */
+          /* prot_cstri("free_locobj value ");
+          prot_int((intType) locobj->init_value);
+          prot_cstri(" ");
+          trace1(locobj->init_value);
+          prot_nl(); */
+          destroy_local_init_value(locobj, &err_info);
+          FREE_OBJECT(locobj->init_value);
+          /* dump_any_temp(locobj->init_value); */
         } /* if */
         /* if (locobj->object->value.objValue != NULL &&
             CATEGORY_OF_OBJ(locobj->object->value.objValue) != SYMBOLOBJECT) {
@@ -217,7 +211,7 @@ void free_block (blockType block)
 
 
 
-blockType new_block (locListType block_params, const_locObjType block_result,
+blockType new_block (const_locObjType block_result,
     locListType block_local_vars, listType block_local_consts,
     objectType block_body)
 
@@ -225,10 +219,10 @@ blockType new_block (locListType block_params, const_locObjType block_result,
     register blockType created_block;
 
   /* new_block */
-    logFunction(printf("new_block(" FMT_U_MEM ")\n", (memSizeType) block_params););
+    logFunction(printf("new_block\n"););
     if (ALLOC_RECORD(created_block, blockRecord, count.block)) {
       created_block->usage_count = 1;
-      created_block->params = block_params;
+      created_block->params = NULL;
       if (block_result == NULL) {
         created_block->result.object           = NULL;
         created_block->result.init_value       = NULL;
@@ -280,22 +274,28 @@ static void append_to_loclist (locListType **list_insert_place, objectType objec
 
 
 
-void get_result_var (locObjType result_var, typeType result_type,
+boolType get_result_var (locObjType result_var, typeType result_type,
     objectType result_init, errInfoType *err_info)
 
-  { /* get_result_var */
+  {
+    boolType tempValue = FALSE;
+
+  /* get_result_var */
     logFunction(printf("get_result_var\n"););
-    result_init = copy_expression(result_init, err_info);
-    if (CATEGORY_OF_OBJ(result_init) == MATCHOBJECT) {
-      SET_CATEGORY_OF_OBJ(result_init, CALLOBJECT);
-    } /* if */
     result_var->object->type_of = result_type;
     INIT_CATEGORY_OF_VAR(result_var->object, RESULTOBJECT);
     result_var->object->value.objValue = NULL;
-    result_var->init_value = result_init;
+    result_var->init_value = NULL;
     result_var->create_call_obj = get_create_call_obj(result_var->object, err_info);
     result_var->destroy_call_obj = get_destroy_call_obj(result_var->object, err_info);
-    logFunction(printf("get_result_var -->\n"););
+    if (*err_info == OKAY_NO_ERROR) {
+      if (TEMP_OBJECT(result_init)) {
+        tempValue = TRUE;
+      } /* if */
+      result_var->init_value = create_return_object(result_var, result_init, err_info);
+    } /* if */
+    logFunction(printf("get_result_var --> %d\n", tempValue););
+    return tempValue;
   } /* get_result_var */
 
 

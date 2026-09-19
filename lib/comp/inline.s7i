@@ -41,10 +41,6 @@ const type: inlineDepthHash is hash [reference] integer;
 var inlineDepthHash: functionInlineDepth is inlineDepthHash.value;
 
 
-const func boolean: isPointerParam (in reference: a_param) is forward;
-
-const func boolean: isCopyParam (in reference: a_param) is forward;
-
 const func boolean: canTakeAddress (in reference: an_expression) is forward;
 
 const func boolean: getConstant (in reference: currExpr,
@@ -225,10 +221,11 @@ const proc: push_inline_func_params (in ref_list: formal_params,
     in ref_list: actual_params, inout expr_type: c_expr) is func
 
   local
+    var reference: formal_param is NIL;
     var integer: number is 0;
   begin
-    for number range 1 to length(formal_params) do
-      push_inline_func_param(formal_params[number], actual_params[number], c_expr);
+    for formal_param key number range formal_params do
+      push_inline_func_param(formal_param, actual_params[number], c_expr);
     end for;
   end func;
 
@@ -264,10 +261,10 @@ const proc: pop_inline_func_params (in ref_list: formal_params,
     inout string: expr) is func
 
   local
-    var integer: number is 0;
+    var reference: formal_param is NIL;
   begin
-    for number range 1 to length(formal_params) do
-      pop_inline_func_param(formal_params[number], expr);
+    for formal_param range formal_params do
+      pop_inline_func_param(formal_param, expr);
     end for;
   end func;
 
@@ -288,6 +285,7 @@ const proc: process_inline_func (in reference: function,
     function_type := getType(function);
     result_type := resultType(function_type);
     formal_params := formalParams(function);
+    checkParameterAliasing(function, formal_params, actual_params, c_expr);
     inline_decls.temp_num := c_expr.temp_num;
     push_inline_func_params(formal_params, actual_params, inline_decls);
     process_local_var_declaration(function, inline_decls);
@@ -488,10 +486,11 @@ const proc: push_inline_proc_params (in ref_list: formal_params,
     in ref_list: actual_params, inout expr_type: c_expr) is func
 
   local
+    var reference: formal_param is NIL;
     var integer: number is 0;
   begin
-    for number range 1 to length(formal_params) do
-      push_inline_proc_param(formal_params[number], actual_params[number], c_expr);
+    for formal_param key number range formal_params do
+      push_inline_proc_param(formal_param, actual_params[number], c_expr);
     end for;
   end func;
 
@@ -527,10 +526,10 @@ const proc: pop_inline_proc_params (in ref_list: formal_params,
     inout expr_type: c_expr) is func
 
   local
-    var integer: number is 0;
+    var reference: formal_param is NIL;
   begin
-    for number range 1 to length(formal_params) do
-      pop_inline_proc_param(formal_params[number], c_expr);
+    for formal_param range formal_params do
+      pop_inline_proc_param(formal_param, c_expr);
     end for;
   end func;
 
@@ -545,6 +544,7 @@ const proc: process_inline_proc (in reference: function,
   begin
     diagnosticLine := diagnosticLine(function);
     formal_params := formalParams(function);
+    checkParameterAliasing(function, formal_params, actual_params, c_expr);
     c_expr.expr &:= diagnosticLine;
     c_expr.expr &:= "/* inline proc o_";
     create_name2(function, c_expr.expr);
